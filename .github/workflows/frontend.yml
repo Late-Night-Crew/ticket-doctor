@@ -1,0 +1,95 @@
+# GitHub Actions workflow: GitHub reads every .yml file in .github/workflows/
+# and runs it when its trigger ("on:") happens. This one checks the frontend.
+
+# The name shown in the Actions tab and on pull requests.
+name: Frontend CI
+
+# WHEN to run.
+on:
+  # Every push to main...
+  push:
+    branches: [main]
+    # ...but only if something in the frontend (or this file) changed.
+    # Backend-only commits won't spend CI minutes here.
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+  # Every pull request (against any branch), with the same path filter.
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+  # Adds a "Run workflow" button in the Actions tab for manual runs.
+  workflow_dispatch:
+
+# If you push again while a run is still going on the same branch,
+# cancel the old run: only the newest commit matters.
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: this workflow only needs to read the code.
+permissions:
+  contents: read
+
+# WHAT to run. A workflow has one or more jobs; each job gets a fresh
+# virtual machine (a "runner"). Jobs run in parallel unless linked.
+jobs:
+  checks:
+    # The name shown as the check on a pull request.
+    name: Lint, typecheck, test, build
+    # A clean Ubuntu machine hosted by GitHub, thrown away after the job.
+    runs-on: ubuntu-latest
+    # Safety net so a hung step can't burn minutes for hours.
+    timeout-minutes: 15
+    # Every "run:" step below starts inside frontend/.
+    defaults:
+      run:
+        working-directory: frontend
+
+    # Steps run one after another. If any step fails, the job stops and
+    # is marked red, and the steps after it are skipped.
+    steps:
+      # 1. The runner starts empty: download this repo's code at the
+      #    commit being tested. "uses:" runs a published action.
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      # 2. Install Node.js (same major version we use locally) and cache
+      #    npm's download folder between runs, keyed on the lockfile,
+      #    so later runs install faster.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # 3. "npm ci" (not "npm install") installs exactly what
+      #    package-lock.json says and fails if it's out of sync with
+      #    package.json, so CI tests what we actually committed.
+      - name: Install dependencies
+        run: npm ci
+
+      # 4-7. The same checks we run locally. Each is its own step so a
+      #      failure shows straight away which kind of problem it is.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # 8. Keep the built site as a downloadable "artifact" on the run's
+      #    page for 7 days, handy for checking exactly what was built.
+      - name: Upload build
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
