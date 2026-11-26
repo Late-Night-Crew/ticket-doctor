@@ -32,7 +32,7 @@ football-data.co.uk CSVs ──┐
 
 | Concern | Choice | Same as nsms? |
 |---|---|---|
-| HTTP | Fiber | Yes (version: see D1) |
+| HTTP | Fiber **v3** (decided, D1) | Same framework; nsms is on v2 |
 | CLI | cobra | Yes |
 | Config | viper YAML + `TD_*` environment variables for secrets | Yes |
 | Database | PostgreSQL via **pgx v5 only** | Simplified: nsms mixes pgx v4, pgx v5 and lib/pq |
@@ -130,9 +130,9 @@ Each milestone ends with green CI and a pull request.
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | **Fiber v2 or v3?** v2 is what nsms uses but is now in maintenance; v3 is the current major release, with mostly the same handler style | **v3**: a new project should start on the supported major version, and the differences are small enough to learn while building |
-| D2 | **Database host.** Render's free Postgres expires after 30 days; Supabase's free tier pauses after a week without activity | **Supabase**: the daily import keeps it active |
-| D3 | **Module name** | `ticketdoctor`, short like `nsms` |
+| D1 | ~~Fiber v2 or v3?~~ | **Decided 2026-11-26: v3** |
+| D2 | ~~Database host~~ | **Decided 2026-11-26: Supabase** (Postgres). The daily import keeps the free tier from pausing; the API connects with the connection string in `TD_DATABASE_URL` |
+| D3 | ~~Module name~~ | **`ticketdoctor`** (used in B0) |
 | D4 | **Fixtures source (FR-1.2).** football-data.co.uk also publishes upcoming fixtures as a CSV (no API key); football-data.org needs a free key and allows 10 requests a minute | **Try the CSV first** in B2, with football-data.org as the fallback. Verify coverage for all three leagues before committing |
 | D5 | **Admin auth (open question 6)** | Reuse the nsms JWT login with admin users created from config; decide before B6 |
 
