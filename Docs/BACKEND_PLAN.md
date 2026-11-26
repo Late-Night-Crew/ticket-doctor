@@ -116,8 +116,12 @@ Each milestone ends with green CI and a pull request.
 - Results aggregation, including the like-for-like figure if question 10 is agreed.
 - Done when, after a matchday is imported, `/api/results` counts change correctly and pending legs stay pending.
 
+**Release process (added 2026-11-26).** Tag-based releases are in place: `v0.1.0` exists, and `release.yml` checks the tagged commit, builds `ghcr.io/late-night-crew/ticket-doctor-api:<tag>` and creates the GitHub Release. See [RELEASING.md](../RELEASING.md). Every migration from B2 on must follow its backward-compatibility rule.
+
 **B5 Go live (SRS M4)**
-- Database host (D2), `Dockerfile` + `deploy/start.sh` + `render.yaml`.
+- Database host (D2). `Dockerfile` and `deploy/start.sh` already exist (release tooling).
+- Render as an image-backed service pulling from ghcr.io. The package is private while the repo is private, so Render needs registry credentials until then.
+- `release.yml` deploy jobs: deploy the tagged image to Render and the frontend to Vercel, with Vercel's Git production deploys switched off.
 - `.github/workflows/import.yml` (daily cron, `TD_DATABASE_URL` stored as a repository secret).
 - Vercel `VITE_API_URL`, CORS, and the frontend Content-Security-Policy header.
 - Make the repository public (needed for Render's free tier).
