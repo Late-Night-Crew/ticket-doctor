@@ -8,6 +8,10 @@ A web app that reviews a football bet ticket leg by leg, flags risky picks, and 
 | [`frontend/`](frontend) | React (Vite and TypeScript), Bootstrap and custom CSS. Runs on a mock API until the Go backend exists. See [frontend/README.md](frontend/README.md) |
 | [`backend/`](backend) | Go API, scaffolded with the same layout as the Late Night Crew backend. Plan: [Docs/BACKEND_PLAN.md](Docs/BACKEND_PLAN.md) |
 
+## Releases
+
+Production changes only through version tags (`v0.2.0`); see [RELEASING.md](RELEASING.md) for how to release, roll back and write safe migrations.
+
 ## Quick start
 
 ```bash

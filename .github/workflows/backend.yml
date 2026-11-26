@@ -14,9 +14,18 @@ on:
       - 'backend/**'
       - '.github/workflows/backend.yml'
   workflow_dispatch:
+  # Lets release.yml run these same checks on a release tag (a "reusable workflow").
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit, branch or tag to check (empty = the triggering commit)
+        type: string
+        default: ''
 
 concurrency:
-  group: backend-${{ github.ref }}
+  # github.workflow is the *calling* workflow when reused, so a release run and
+  # a normal CI run on the same branch never cancel each other.
+  group: backend-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -34,6 +43,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
 
       # Go instead of Node. go-version-file reads the version from go.mod, so CI
       # always uses the same Go version as the project (no number to keep in sync).

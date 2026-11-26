@@ -21,11 +21,20 @@ on:
       - '.github/workflows/frontend.yml'
   # Adds a "Run workflow" button in the Actions tab for manual runs.
   workflow_dispatch:
+  # Lets release.yml run these same checks on a release tag (a "reusable workflow").
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit, branch or tag to check (empty = the triggering commit)
+        type: string
+        default: ''
 
 # If you push again while a run is still going on the same branch,
 # cancel the old run: only the newest commit matters.
 concurrency:
-  group: frontend-${{ github.ref }}
+  # github.workflow is the *calling* workflow when reused, so a release run and
+  # a normal CI run on the same branch never cancel each other.
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 # Least privilege: this workflow only needs to read the code.
@@ -54,6 +63,8 @@ jobs:
       #    commit being tested. "uses:" runs a published action.
       - name: Check out code
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
 
       # 2. Install Node.js (same major version we use locally) and cache
       #    npm's download folder between runs, keyed on the lockfile,

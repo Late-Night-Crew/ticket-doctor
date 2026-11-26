@@ -1,0 +1,8 @@
+# Keep secrets and local files out of the image build.
+config.yaml
+data/
+ticketdoctor
+.git
+*.md
+docker-compose.yml
+Taskfile.yml

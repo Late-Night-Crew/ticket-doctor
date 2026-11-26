@@ -1,0 +1,217 @@
+# Release: runs when a version tag (v1.2.3) is pushed, or by hand for an
+# existing tag (re-release / rollback). See RELEASING.md.
+#
+#   prepare ──► frontend checks ──┐
+#           └─► backend checks ───┴─► image ──► github-release ──► (deploy, from B5)
+#
+# Each arrow is "needs:": a job starts only when the jobs it needs succeeded.
+
+name: Release
+
+on:
+  # Pushing a tag like v0.2.0 starts a release.
+  push:
+    tags: ['v*.*.*']
+  # "Run workflow" button in the Actions tab: release an existing tag again
+  # (e.g. to roll back to it, or to build an image a tag doesn't have yet).
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, e.g. v0.1.0
+        required: true
+        type: string
+  # Dry run on pull requests that change the release setup: everything is
+  # built and checked, but nothing is published.
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'backend/Dockerfile'
+      - 'backend/.dockerignore'
+      - 'backend/deploy/**'
+
+# Releases queue up one after another and are never cancelled half way.
+concurrency:
+  group: release-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # Registry names must be lowercase.
+  IMAGE: ghcr.io/late-night-crew/ticket-doctor-api
+
+jobs:
+  # 1. Work out which tag we're releasing and refuse anything unsafe.
+  prepare:
+    name: Resolve and validate the tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      sha: ${{ steps.resolve.outputs.sha }}
+      dry_run: ${{ steps.resolve.outputs.dry_run }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # full history and all tags, to check the tag is on main
+
+      - name: Resolve tag
+        id: resolve
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          PR_NUMBER: ${{ github.event.number }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            {
+              echo "tag=v0.0.0-pr$PR_NUMBER"
+              echo "sha=$SHA"
+              echo "dry_run=true"
+              echo "prerelease=true"
+            } >> "$GITHUB_OUTPUT"
+            echo "Dry run for pull request #$PR_NUMBER: nothing will be published."
+            exit 0
+          fi
+
+          if [ "$EVENT" = "workflow_dispatch" ]; then tag="$INPUT_TAG"; else tag="$REF_NAME"; fi
+
+          # Semantic version, optionally with a pre-release suffix: v1.2.3 or v1.2.3-rc.1
+          if ! echo "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$tag' is not a version tag like v1.2.3"
+            exit 1
+          fi
+          if ! sha="$(git rev-list -n 1 "refs/tags/$tag" 2>/dev/null)"; then
+            echo "::error::Tag $tag does not exist"
+            exit 1
+          fi
+          # Only commits that went through a pull request into main can be released.
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::error::Tag $tag points at ${sha:0:7}, which is not on main"
+            exit 1
+          fi
+
+          case "$tag" in *-*) prerelease=true ;; *) prerelease=false ;; esac
+          {
+            echo "tag=$tag"
+            echo "sha=$sha"
+            echo "dry_run=false"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag (commit ${sha:0:7})"
+
+  # 2. The same checks as normal CI, run on exactly the tagged commit
+  #    (reusable workflows: see "workflow_call" in frontend.yml and backend.yml).
+  frontend-checks:
+    name: Frontend checks
+    needs: prepare
+    uses: ./.github/workflows/frontend.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
+
+  backend-checks:
+    name: Backend checks
+    needs: prepare
+    uses: ./.github/workflows/backend.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
+
+  # 3. Build the API image once, labelled with the version. Deploys and
+  #    rollbacks use this exact image, never a rebuild.
+  image:
+    name: Build backend image
+    needs: [prepare, frontend-checks, backend-checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write # push to GitHub's container registry (ghcr.io)
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to ghcr.io
+        if: needs.prepare.outputs.dry_run != 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          build-args: VERSION=${{ needs.prepare.outputs.tag }}
+          tags: ${{ env.IMAGE }}:${{ needs.prepare.outputs.tag }}
+          push: ${{ needs.prepare.outputs.dry_run != 'true' }}
+          # Reuse layers from earlier builds (stored in the Actions cache).
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: image built for $TAG but not pushed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### Backend image"
+              echo "\`$IMAGE:$TAG\`"
+              echo
+              echo "Digest: \`$DIGEST\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # 4. Create the GitHub Release (notes generated from merged pull requests),
+  #    or, if the release already exists, add the image line to it.
+  github-release:
+    name: GitHub Release
+    needs: [prepare, image]
+    if: needs.prepare.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create and edit releases
+    steps:
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          line="**Backend image:** \`$IMAGE:$TAG\`"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+            if printf '%s' "$body" | grep -qF "$IMAGE:$TAG"; then
+              echo "Release $TAG already lists its image; nothing to change."
+            else
+              gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$body
+
+          $line"
+              echo "Added the image to the existing release $TAG."
+            fi
+          else
+            flags=""
+            if [ "$PRERELEASE" = "true" ]; then flags="--prerelease"; fi
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "$TAG" --generate-notes --notes "$line" $flags
+            echo "Created release $TAG."
+          fi
+
+  # 5. Deploy (added in B5, see Docs/BACKEND_PLAN.md):
+  #    - deploy-api:      tell Render to run $IMAGE:<tag> (Render API, secret RENDER_API_KEY)
+  #    - deploy-frontend: build with VITE_API_URL and publish to Vercel production
+  #                       (Vercel CLI, secret VERCEL_TOKEN; Git auto-deploys to
+  #                       production switched off, so only releases reach it)
+  #    Both "needs: github-release", so nothing deploys unless everything above passed.
