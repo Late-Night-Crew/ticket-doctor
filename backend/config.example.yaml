@@ -1,7 +1,8 @@
 # Copy to config.yaml for local development (config.yaml is not committed).
 # config.yaml is optional: every setting has a default, and environment variables
 # override the file. Put secrets in environment variables, not here:
-#   TD_DATABASE_URL     Postgres connection string (contains the password)
+#   TD_DATABASE_PASSWORD  password for the database fields below
+#   TD_DATABASE_URL       full connection string (Supabase); overrides the fields
 #   TD_ENVIRONMENT      overrides "environment"
 #   PORT / TD_PORT      listen port (Render sets PORT)
 
@@ -19,12 +20,24 @@ server:
   trusted_proxies: []
 
 database:
-  # Local: the docker-compose database (task db:up).
-  # Supabase: use the *session pooler* connection string (port 5432 on the pooler
-  # host). The direct host is IPv6-only on the free plan, and the transaction pooler
-  # (port 6543) does not support the prepared statements pgx uses.
-  url: "postgres://ticketdoctor:ticketdoctor@127.0.0.1:55432/ticketdoctor?sslmode=disable"
+  # Local Postgres, same style as the School Management System config.
+  # Create the database once: psql -U postgres -c "CREATE DATABASE ticketdoctor"
+  host: localhost
+  port: 5432
+  username: "postgres"
+  password: ""          # your local password, or TD_DATABASE_PASSWORD
+  name: "ticketdoctor"
+  sslmode: disable      # require for a remote database
   max_conns: 5
+
+  # Supabase (B5): set TD_DATABASE_URL instead of the fields above; it wins.
+  # Use the *session pooler* connection string (port 5432 on the pooler host).
+  # The direct host is IPv6-only on the free plan, and the transaction pooler
+  # (port 6543) does not support the prepared statements pgx uses.
+  # url: ""
+
+  # No local Postgres? "task db:up" starts one in Docker on port 55432:
+  #   host: 127.0.0.1, port: 55432, username/password/name: ticketdoctor
 
 logging:
   level: info            # debug | info | warn | error

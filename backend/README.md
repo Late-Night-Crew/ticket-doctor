@@ -6,15 +6,18 @@ Go API for Ticket Doctor. It has the same layout as the Late Night Crew School M
 
 ## Run it
 
+Uses your local Postgres, set up like the School Management System's: same `postgres` login on `localhost:5432`, separate `ticketdoctor` database.
+
 ```bash
 cd backend
-task db:up        # local Postgres in Docker (port 55432)
-task migrate      # apply migrations (none yet in B0)
+psql -U postgres -h localhost -c "CREATE DATABASE ticketdoctor"   # once
+cp config.example.yaml config.yaml                                  # once; fill in the password
+task migrate      # apply migrations
 task dev          # API on http://127.0.0.1:8080, try /api/health
 task check        # everything CI runs
 ```
 
-There's no need for a `config.yaml`: defaults work locally. Copy `config.example.yaml` to `config.yaml` to change settings. Secrets go in environment variables (`TD_DATABASE_URL`).
+`config.yaml` is gitignored, so the password stays on your machine. No local Postgres? `task db:up` starts one in Docker on port 55432 (see `config.example.yaml`). Supabase comes in B5, through `TD_DATABASE_URL`.
 
 ## Layout
 
@@ -34,6 +37,7 @@ There's no need for a `config.yaml`: defaults work locally. Copy `config.example
 | `common/` | Request parsing and validation, SQL and HTTP helpers | same |
 | `logging/` | Logger and module names | same |
 | `db/` | `embed.go` (migrations and seeds in the binary), `connect.go` (pgx v5 pool) | same |
+| `config.yaml` | Local settings and password (**not committed**) | same |
 | `db/migrations/` | Goose SQL migrations `NN_description.sql` | same |
 | `db/seeds/` | Demo data for `ticketdoctor seed` | same |
 | `database/dbsqlc/` | sqlc output; generated, never edited by hand | same |

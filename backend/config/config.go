@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -41,12 +42,59 @@ type ServerConfig struct {
 	TrustedProxies []string `mapstructure:"trusted_proxies"`
 }
 
+// DatabaseConfig connects to Postgres either with separate fields (local
+// development, same style as nsms) or with one connection string (Supabase).
+// When URL is set it wins and the fields are ignored.
 type DatabaseConfig struct {
-	// URL is a Postgres connection string. Set it with TD_DATABASE_URL rather
-	// than in the file: it contains the password.
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	// Password can come from TD_DATABASE_PASSWORD instead of the file.
+	Password string `mapstructure:"password"`
+	Name     string `mapstructure:"name"`
+	// Sslmode is disable for a local database, require for a remote one.
+	Sslmode string `mapstructure:"sslmode"`
+
+	// URL is a full connection string, e.g. from Supabase. Set it with
+	// TD_DATABASE_URL rather than in the file: it contains the password.
 	URL string `mapstructure:"url"`
+
 	// MaxConns caps the connection pool. Supabase's free tier allows few connections.
 	MaxConns int32 `mapstructure:"max_conns"`
+}
+
+// ConnString returns the connection string to use: URL if set, otherwise one
+// built from the fields. It is empty when no database is configured.
+func (d DatabaseConfig) ConnString() string {
+	if d.URL != "" {
+		return d.URL
+	}
+	if d.Host == "" || d.Name == "" {
+		return ""
+	}
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(d.Username, d.Password), // escapes special characters
+		Host:   net.JoinHostPort(d.Host, strconv.Itoa(d.Port)),
+		Path:   "/" + d.Name,
+	}
+	if d.Sslmode != "" {
+		u.RawQuery = url.Values{"sslmode": {d.Sslmode}}.Encode()
+	}
+	return u.String()
+}
+
+// Describe names the database for logs without revealing the password.
+func (d DatabaseConfig) Describe() string {
+	conn := d.ConnString()
+	if conn == "" {
+		return "(not configured)"
+	}
+	u, err := url.Parse(conn)
+	if err != nil {
+		return "(unreadable connection string)"
+	}
+	return u.Host + u.Path
 }
 
 type LoggingConfig struct {
@@ -65,7 +113,7 @@ func Defaults() *Config {
 			Port:           8080,
 			AllowedOrigins: []string{"http://localhost:5173"},
 		},
-		Database: DatabaseConfig{MaxConns: 5},
+		Database: DatabaseConfig{Port: 5432, Sslmode: "disable", MaxConns: 5},
 		Logging:  LoggingConfig{Level: "info", Format: "text"},
 	}
 }
@@ -107,7 +155,8 @@ func Load(path string) (*Config, error) {
 // os.LookupEnv in production and a map in tests.
 //
 //	TD_ENVIRONMENT        DEVELOPMENT or PRODUCTION
-//	TD_DATABASE_URL       Postgres connection string (secret)
+//	TD_DATABASE_URL       full Postgres connection string, e.g. Supabase (secret)
+//	TD_DATABASE_PASSWORD  password for the host/port/name fields (secret)
 //	TD_HOST, TD_PORT      listen address; PORT (set by Render) also works
 //	TD_ALLOWED_ORIGINS    comma-separated frontend origins
 //	TD_TRUSTED_PROXIES    comma-separated IPs or CIDR ranges
@@ -126,6 +175,7 @@ func (c *Config) ApplyEnvironment(lookup func(string) (string, bool)) error {
 
 	str("TD_ENVIRONMENT", &c.Environment)
 	str("TD_DATABASE_URL", &c.Database.URL)
+	str("TD_DATABASE_PASSWORD", &c.Database.Password)
 	str("TD_HOST", &c.Server.Host)
 	str("TD_LOG_LEVEL", &c.Logging.Level)
 	str("TD_LOG_FORMAT", &c.Logging.Format)
@@ -169,12 +219,15 @@ func (c *Config) Validate() error {
 	if c.Logging.Format != "text" && c.Logging.Format != "json" {
 		problems = append(problems, fmt.Sprintf("logging format must be text or json, got %q", c.Logging.Format))
 	}
+	if c.Database.URL == "" && c.Database.Host != "" && (c.Database.Port < 1 || c.Database.Port > 65535) {
+		problems = append(problems, fmt.Sprintf("database port must be 1-65535, got %d", c.Database.Port))
+	}
 	if c.Database.MaxConns < 1 {
 		problems = append(problems, "database max_conns must be at least 1")
 	}
 	if c.IsProduction() {
-		if c.Database.URL == "" {
-			problems = append(problems, "PRODUCTION needs a database URL (TD_DATABASE_URL)")
+		if c.Database.ConnString() == "" {
+			problems = append(problems, "PRODUCTION needs a database (TD_DATABASE_URL, or database host and name)")
 		}
 		if len(c.Server.AllowedOrigins) == 0 {
 			problems = append(problems, "PRODUCTION needs allowed origins (TD_ALLOWED_ORIGINS)")

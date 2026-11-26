@@ -73,6 +73,48 @@ func TestEnvironmentOverrides(t *testing.T) {
 	}
 }
 
+func TestDatabaseFieldsBuildConnString(t *testing.T) {
+	cfg, err := Load(writeFile(t, `
+database:
+  host: localhost
+  port: 5432
+  username: postgres
+  password: "p@ss:w/rd"
+  name: ticketdoctor
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "postgres://postgres:p%40ss%3Aw%2Frd@localhost:5432/ticketdoctor?sslmode=disable"
+	if got := cfg.Database.ConnString(); got != want {
+		t.Fatalf("ConnString() = %q, want %q", got, want)
+	}
+	if got := cfg.Database.Describe(); got != "localhost:5432/ticketdoctor" || strings.Contains(got, "p@ss") {
+		t.Fatalf("Describe() = %q", got)
+	}
+}
+
+func TestDatabaseURLWinsAndPasswordFromEnv(t *testing.T) {
+	cfg := Defaults()
+	cfg.Database.Host, cfg.Database.Name, cfg.Database.Username = "localhost", "ticketdoctor", "postgres"
+	if err := cfg.ApplyEnvironment(env(map[string]string{"TD_DATABASE_PASSWORD": "secret"})); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(cfg.Database.ConnString(), "postgres:secret@") {
+		t.Fatalf("password from env not used: %q", cfg.Database.ConnString())
+	}
+	cfg.Database.URL = "postgres://u:p@pooler.supabase.com:5432/postgres"
+	if cfg.Database.ConnString() != cfg.Database.URL {
+		t.Fatal("URL should win over the fields")
+	}
+}
+
+func TestNoDatabaseConfigured(t *testing.T) {
+	if got := Defaults().Database.ConnString(); got != "" {
+		t.Fatalf("defaults should have no database, got %q", got)
+	}
+}
+
 func TestTDPortWinsOverRenderPort(t *testing.T) {
 	cfg := Defaults()
 	if err := cfg.ApplyEnvironment(env(map[string]string{"PORT": "10000", "TD_PORT": "7000"})); err != nil {

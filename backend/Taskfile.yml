@@ -41,13 +41,13 @@ tasks:
     cmds: [go run . migrate]
 
   db:up:
-    desc: Start the local Postgres (docker compose)
+    desc: Start the optional Docker Postgres (port 55432)
     cmds: [docker compose up -d --wait]
 
   db:down:
-    desc: Stop the local Postgres (data kept)
+    desc: Stop the Docker Postgres (data kept)
     cmds: [docker compose down]
 
   db:reset:
-    desc: Delete the local database and start fresh
+    desc: Delete the Docker Postgres data and start fresh
     cmds: [docker compose down -v, docker compose up -d --wait]
