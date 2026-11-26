@@ -1,0 +1,124 @@
+body {
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.td-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.td-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--td-muted);
+}
+
+.td-surface {
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
+  border-radius: var(--bs-border-radius-lg);
+  box-shadow: var(--td-shadow);
+}
+
+.btn {
+  min-height: var(--td-tap);
+}
+
+// Visible focus for keyboard users
+:focus-visible {
+  outline: 3px solid var(--td-brand);
+  outline-offset: 2px;
+}
+
+.td-link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.flex-none {
+  flex: none;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+// Dark mode: brighten brand buttons so they keep contrast on dark surfaces.
+[data-bs-theme='dark'] {
+  // #0f766e on white text is 5.5:1 (WCAG AA); hover darkens rather than lightens.
+  .btn-primary {
+    --bs-btn-bg: #0f766e;
+    --bs-btn-border-color: #0f766e;
+    --bs-btn-hover-bg: #0d6d66;
+    --bs-btn-hover-border-color: #0d6d66;
+    --bs-btn-active-bg: #0d6d66;
+    --bs-btn-active-border-color: #0d6d66;
+    --bs-btn-disabled-bg: #0f766e;
+    --bs-btn-disabled-border-color: #0f766e;
+  }
+
+  .btn-outline-primary {
+    --bs-btn-color: var(--td-brand);
+    --bs-btn-border-color: var(--td-brand);
+    --bs-btn-hover-bg: var(--td-brand);
+    --bs-btn-hover-border-color: var(--td-brand);
+    --bs-btn-hover-color: #10171d;
+    --bs-btn-active-bg: var(--td-brand);
+    --bs-btn-active-color: #10171d;
+  }
+
+  // Bootstrap keeps the light-mode danger red in dark mode (2.7:1 on our surfaces).
+  --bs-danger: #f08a7e;
+  --bs-danger-rgb: 240, 138, 126;
+  --bs-danger-text-emphasis: #f6b0a8;
+
+  .btn-outline-danger {
+    --bs-btn-color: #f08a7e;
+    --bs-btn-border-color: #f08a7e;
+    --bs-btn-hover-color: #10171d;
+    --bs-btn-hover-bg: #f08a7e;
+    --bs-btn-hover-border-color: #f08a7e;
+    --bs-btn-active-bg: #f08a7e;
+    --bs-btn-active-color: #10171d;
+  }
+
+  .btn-outline-secondary {
+    --bs-btn-color: var(--td-muted);
+    --bs-btn-border-color: var(--td-muted);
+    --bs-btn-hover-color: #10171d;
+    --bs-btn-hover-bg: var(--td-muted);
+    --bs-btn-hover-border-color: var(--td-muted);
+  }
+
+  .btn-link:not(.text-body-secondary):not(.text-danger) {
+    --bs-btn-color: var(--td-brand);
+    --bs-btn-hover-color: var(--td-brand);
+    --bs-btn-active-color: var(--td-brand);
+  }
+
+  a:not(.btn):not(.nav-link):not(.td-path-card) {
+    --bs-link-color-rgb: 111, 209, 197;
+  }
+}
+
+
+// The main landmark takes focus on navigation; no outline for that programmatic focus.
+#main:focus {
+  outline: none;
+}

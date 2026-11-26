@@ -1,0 +1,167 @@
+.td-market-filter {
+  max-width: 20rem;
+}
+
+.td-record__rate {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.td-record__counts {
+  font-size: 1.05rem;
+}
+
+// Won/lost: equal size and weight, colour plus words (RG-3).
+.td-wl-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  font-weight: 600;
+
+  &__won {
+    color: var(--td-risk-low);
+  }
+  &__lost {
+    color: var(--td-risk-high);
+  }
+}
+
+.td-wl {
+  display: flex;
+  height: 0.5rem;
+  gap: 2px;
+  border-radius: $border-radius-pill;
+  background: var(--td-surface-2);
+  overflow: hidden;
+
+  &__won {
+    background: var(--td-risk-low);
+  }
+  &__lost {
+    background: var(--td-risk-high);
+  }
+}
+
+.td-hitcell {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.875rem;
+}
+
+.td-small-sample {
+  padding: 0.05rem 0.45rem;
+  border-radius: $border-radius-pill;
+  border: 1px dashed var(--td-muted);
+  color: var(--td-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+// Table on md+, stacked cards on phones.
+.td-results-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
+  border-radius: var(--bs-border-radius-lg);
+  box-shadow: var(--td-shadow);
+  overflow: hidden;
+
+  th,
+  td {
+    padding: 0.75rem 1rem;
+    vertical-align: top;
+    text-align: left;
+  }
+
+  thead th {
+    background: var(--td-surface-2);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--td-muted);
+  }
+
+  tbody tr + tr > * {
+    border-top: 1px solid var(--td-line);
+  }
+
+  tbody th {
+    font-weight: 700;
+  }
+
+  td:nth-child(n + 3) {
+    width: 30%;
+  }
+
+  @include media-breakpoint-down(md) {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+
+    thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    tbody {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    tr {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.25rem 1rem;
+      padding: 0.9rem 1rem;
+      background: var(--td-surface);
+      border: 1px solid var(--td-line);
+      border-radius: var(--bs-border-radius-lg);
+      box-shadow: var(--td-shadow);
+    }
+
+    tbody tr + tr > * {
+      border-top: 0;
+    }
+
+    th,
+    td {
+      padding: 0;
+      width: auto !important;
+    }
+
+    // market + league on one line across the card
+    tbody th {
+      grid-column: 1;
+    }
+
+    td[data-label]:nth-child(2) {
+      grid-column: 2;
+      text-align: right;
+      color: var(--td-muted);
+      font-size: 0.875rem;
+    }
+
+    td:nth-child(n + 3) {
+      margin-top: 0.5rem;
+
+      &::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 0.2rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--td-muted);
+      }
+    }
+  }
+}

@@ -1,0 +1,148 @@
+.td-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.td-main {
+  flex: 1;
+  padding-top: 1.25rem;
+  // leave room for the mobile bottom nav
+  padding-bottom: calc(var(--td-nav-height) + 1.5rem);
+
+  @include media-breakpoint-up(md) {
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+  }
+}
+
+.td-container {
+  max-width: 960px;
+  padding-inline: 1rem;
+  margin-inline: auto;
+}
+
+// Top bar
+.td-topbar {
+  background: var(--td-surface);
+  border-bottom: 1px solid var(--td-line);
+
+  .navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--td-ink);
+  }
+
+  .nav-link {
+    font-weight: 600;
+    color: var(--td-muted);
+    border-radius: var(--bs-border-radius);
+    padding-inline: 0.75rem !important;
+
+    &.active {
+      color: var(--td-brand);
+      background: var(--td-brand-soft);
+    }
+  }
+}
+
+.td-theme-toggle {
+  min-width: var(--td-tap);
+}
+
+// Mobile bottom navigation
+.td-bottomnav {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: $zindex-fixed;
+  height: var(--td-nav-height);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--td-surface);
+  border-top: 1px solid var(--td-line);
+  padding-bottom: env(safe-area-inset-bottom);
+
+  a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--td-muted);
+    text-decoration: none;
+
+    svg {
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+
+    &.active {
+      color: var(--td-brand);
+    }
+  }
+
+  .td-bottomnav-count {
+    position: absolute;
+    top: -0.35rem;
+    left: 0.9rem;
+    font-size: 0.65rem;
+  }
+
+  @include media-breakpoint-up(md) {
+    display: none;
+  }
+}
+
+// Footer: responsible-gambling notices (RG-4)
+.td-footer {
+  border-top: 1px solid var(--td-line);
+  background: var(--td-surface-2);
+  color: var(--td-muted);
+  font-size: 0.85rem;
+  padding: 1.5rem 0 calc(var(--td-nav-height) + 1.5rem);
+
+  @include media-breakpoint-up(md) {
+    padding-bottom: 1.5rem;
+  }
+
+  .td-age {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    font-weight: 800;
+    font-size: 0.8rem;
+    flex: none;
+  }
+
+  a {
+    color: var(--td-ink);
+    text-decoration: underline;
+  }
+}
+
+.td-disclaimer {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--bs-border-radius);
+  background: var(--td-surface-2);
+  color: var(--td-muted);
+  font-size: 0.875rem;
+
+  svg {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-top: 0.1rem;
+  }
+}

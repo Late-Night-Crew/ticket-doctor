@@ -1,0 +1,73 @@
+.td-summary {
+  &__bands {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0;
+  }
+
+  &__band {
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--bs-border-radius);
+    font-size: 0.85rem;
+    text-align: center;
+
+    &--low {
+      color: var(--td-risk-low);
+      background: var(--td-risk-low-bg);
+    }
+    &--medium {
+      color: var(--td-risk-medium);
+      background: var(--td-risk-medium-bg);
+    }
+    &--high {
+      color: var(--td-risk-high);
+      background: var(--td-risk-high-bg);
+    }
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--td-line);
+  }
+}
+
+.td-swap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--bs-border-radius);
+  background: var(--td-surface);
+}
+
+.td-swapped {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--bs-border-radius);
+  background: var(--td-brand-soft);
+  color: var(--td-ink);
+  font-size: 0.875rem;
+}
+
+.td-updating {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.td-leg:focus {
+  outline: none;
+}
+
+.td-leg:focus-visible {
+  outline: 3px solid var(--td-brand);
+  outline-offset: 2px;
+}

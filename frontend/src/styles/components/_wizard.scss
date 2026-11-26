@@ -1,0 +1,150 @@
+.td-wizard {
+  max-width: 560px;
+  margin-inline: auto;
+
+  &:has(.td-answers) {
+    max-width: 720px;
+  }
+}
+
+.td-progress {
+  display: flex;
+  gap: 0.35rem;
+
+  span {
+    flex: 1;
+    height: 0.3rem;
+    border-radius: $border-radius-pill;
+    background: var(--td-surface-2);
+
+    &.is-done {
+      background: var(--td-brand);
+    }
+  }
+}
+
+.td-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--td-line);
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--td-surface);
+  color: var(--td-ink);
+  text-align: left;
+  box-shadow: var(--td-shadow);
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--td-brand);
+  }
+
+  &__label {
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+
+  &__body {
+    font-size: 0.9rem;
+    color: var(--td-muted);
+  }
+
+  &[aria-pressed='true'] {
+    border-color: var(--td-brand);
+    background: var(--td-brand-soft);
+    box-shadow: inset 0 0 0 1px var(--td-brand);
+  }
+}
+
+.td-points {
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.6rem;
+
+  li::marker {
+    color: var(--td-brand);
+  }
+}
+
+.td-bold {
+  border-top: 4px solid var(--td-risk-high);
+}
+
+.td-answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+
+  li {
+    padding: 0.2rem 0.65rem;
+    border-radius: $border-radius-pill;
+    background: var(--td-surface-2);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--td-muted);
+  }
+}
+
+.td-how {
+  padding: 1rem 1.1rem;
+  border-radius: var(--bs-border-radius-lg);
+  background: var(--td-brand-soft);
+  color: var(--td-ink);
+
+  ul {
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.4rem;
+  }
+}
+
+.td-wizard h1:focus {
+  outline: none;
+}
+
+// Number of games: large tap targets in a grid (5 per row, or fewer for beginners).
+.td-games {
+  display: grid;
+  grid-template-columns: repeat(var(--td-games-cols, 5), minmax(0, 1fr));
+  gap: 0.5rem;
+
+  &__n {
+    min-height: 3.5rem;
+    border: 1px solid var(--td-line);
+    border-radius: var(--bs-border-radius-lg);
+    background: var(--td-surface);
+    color: var(--td-ink);
+    font-size: 1.35rem;
+    font-weight: 800;
+    box-shadow: var(--td-shadow);
+
+    &:hover {
+      border-color: var(--td-brand);
+    }
+
+    &[aria-pressed='true'] {
+      border-color: var(--td-brand);
+      background: var(--td-brand-soft);
+      box-shadow: inset 0 0 0 1px var(--td-brand);
+    }
+  }
+}
+
+.td-reward {
+  display: grid;
+  gap: 1rem;
+
+  @include media-breakpoint-up(sm) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &__odds {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+}

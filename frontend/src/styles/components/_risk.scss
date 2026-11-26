@@ -1,0 +1,43 @@
+// Risk badge: colour + icon + text, so it never relies on colour alone.
+.td-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: $border-radius-pill;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+
+  svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  &--low {
+    color: var(--td-risk-low);
+    background: var(--td-risk-low-bg);
+  }
+  &--medium {
+    color: var(--td-risk-medium);
+    background: var(--td-risk-medium-bg);
+  }
+  &--high {
+    color: var(--td-risk-high);
+    background: var(--td-risk-high-bg);
+  }
+}
+
+.td-value-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: $border-radius-pill;
+  border: 1px solid var(--td-value);
+  color: var(--td-value);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

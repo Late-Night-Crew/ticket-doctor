@@ -1,0 +1,143 @@
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
+import type { Fixture, MarketKey } from '../api/types'
+import { MARKETS, market } from '../config/markets'
+import { FIXTURES, profilesFor } from '../mocks/data'
+import { estimateMarket, suggestSwaps } from '../mocks/scorer'
+import { TICKET_STORAGE_KEY, type TicketState } from '../state/ticketReducer'
+import { renderPage } from '../test/render'
+import { server } from '../test/server'
+import Analysis from './Analysis'
+
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+afterEach(() => {
+  server.resetHandlers()
+  sessionStorage.clear()
+})
+afterAll(() => server.close())
+
+/** Find a leg in the mock data that is risky and has swap suggestions. */
+function riskyLeg(): { fixture: Fixture; market: MarketKey; swapTo: MarketKey } {
+  for (const fixture of FIXTURES) {
+    const { home, away } = profilesFor(fixture)
+    for (const m of MARKETS) {
+      const e = estimateMarket(m.key, home, away)
+      const swaps = suggestSwaps(e, home, away)
+      if (e.risk_band === 'high' && swaps.length) return { fixture, market: m.key, swapTo: swaps[0].market }
+    }
+  }
+  throw new Error('mock data has no risky leg with swaps')
+}
+
+/** A Low-risk leg on a different match. */
+function safeLeg(exclude: string): { fixture: Fixture; market: MarketKey } {
+  for (const fixture of FIXTURES.filter((f) => f.id !== exclude)) {
+    const { home, away } = profilesFor(fixture)
+    for (const m of MARKETS) {
+      if (estimateMarket(m.key, home, away).risk_band === 'low') return { fixture, market: m.key }
+    }
+  }
+  throw new Error('mock data has no low-risk leg')
+}
+
+function seed(legs: { fixture: Fixture; market: MarketKey; odds?: number | null }[]) {
+  const state: TicketState = {
+    ticketId: 'test-ticket',
+    origin: 'manual',
+    legs: legs.map((l) => ({ fixture: l.fixture, market: l.market, odds: l.odds ?? null })),
+    swaps: [],
+    baseline: null,
+  }
+  sessionStorage.setItem(TICKET_STORAGE_KEY, JSON.stringify(state))
+}
+
+const plain = (f: Fixture, m: MarketKey) => market(m).plain(f.home.name, f.away.name)
+const renderAnalysis = () => renderPage(<Analysis />, { path: '/ticket/analysis' })
+
+describe('Analysis screen (FR-4 to FR-6)', () => {
+  it('shows an empty state with no legs', () => {
+    renderAnalysis()
+    expect(screen.getByRole('heading', { name: 'Nothing to analyse yet' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the ticket builder' })).toHaveAttribute('href', '/ticket')
+  })
+
+  it('shows each leg with risk, reason, sample size, the disclaimer and combined chance', async () => {
+    const risky = riskyLeg()
+    const safe = safeLeg(risky.fixture.id)
+    seed([risky, safe])
+    renderAnalysis()
+
+    expect(await screen.findByRole('heading', { name: plain(risky.fixture, risky.market) })).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent(/not guarantees/) // RG-1
+    expect(screen.getAllByText(/High risk/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/last 10 matches/).length).toBeGreaterThan(0) // NFR-5
+    expect(screen.getByText(/about 1 in \d+/)).toBeInTheDocument() // RG-2
+    expect(screen.getByText('Weakest leg', { selector: '.td-eyebrow' })).toBeInTheDocument() // FR-6.3
+  })
+
+  it('accepts a swap in one tap, then shows before and after, and can undo (FR-5.3, FR-6.2)', async () => {
+    const risky = riskyLeg()
+    seed([{ ...risky, odds: 4.5 }])
+    const user = userEvent.setup()
+    renderAnalysis()
+
+    const swapTo = plain(risky.fixture, risky.swapTo)
+    await user.click(await screen.findByRole('button', { name: `Swap to ${swapTo}` }))
+
+    expect(await screen.findByRole('heading', { name: swapTo })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/^was /)).toBeInTheDocument())
+    const notice = screen.getByText(/Swapped from/).closest('.td-swapped') as HTMLElement
+    expect(notice).toHaveTextContent(plain(risky.fixture, risky.market))
+    expect(notice).toHaveTextContent(/Odds were cleared/)
+
+    const saved = JSON.parse(sessionStorage.getItem(TICKET_STORAGE_KEY)!) as TicketState
+    expect(saved.legs[0]).toMatchObject({ market: risky.swapTo, odds: null })
+
+    await user.click(within(notice).getByRole('button', { name: 'Undo' }))
+    expect(await screen.findByRole('heading', { name: plain(risky.fixture, risky.market) })).toBeInTheDocument()
+    expect(screen.queryByText(/^was /)).not.toBeInTheDocument()
+  })
+
+  it('shows combined odds and bookmaker comparison when every leg has odds (FR-6.4)', async () => {
+    const risky = riskyLeg()
+    const safe = safeLeg(risky.fixture.id)
+    seed([
+      { ...risky, odds: 4 },
+      { ...safe, odds: 1.5 },
+    ])
+    renderAnalysis()
+    expect(await screen.findByText('6.00')).toBeInTheDocument()
+    expect(screen.getByText(/price implies 16\.7%/)).toBeInTheDocument()
+  })
+
+  it('removes a leg', async () => {
+    const risky = riskyLeg()
+    const safe = safeLeg(risky.fixture.id)
+    seed([risky, safe])
+    const user = userEvent.setup()
+    renderAnalysis()
+    await user.click(await screen.findByRole('button', { name: `Remove leg: ${plain(risky.fixture, risky.market)}` }))
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: plain(risky.fixture, risky.market) })).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('heading', { name: plain(safe.fixture, safe.market) })).toBeInTheDocument()
+  })
+
+  it('explains when limited data blocks swaps (FR-5.4)', async () => {
+    const thin = FIXTURES.find((f) => /Sunderland|Levante|Hamburg/.test(f.home.name + f.away.name))!
+    const { home, away } = profilesFor(thin)
+    const risky = MARKETS.map((m) => estimateMarket(m.key, home, away)).find((e) => e.risk_band !== 'low')!
+    seed([{ fixture: thin, market: risky.market }])
+    renderAnalysis()
+    expect(await screen.findByText(/too few recent matches/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Swap to/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the API error message', async () => {
+    server.use(http.post('*/api/tickets/analyse', () => HttpResponse.json({ error: 'Only one leg per match.' }, { status: 422 })))
+    seed([riskyLeg()])
+    renderAnalysis()
+    expect(await screen.findByText('Only one leg per match.')).toBeInTheDocument()
+  })
+})

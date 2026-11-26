@@ -1,0 +1,93 @@
+// A leg looks like a ticket stub: a coloured risk edge and a perforated divider.
+.td-leg {
+  position: relative;
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
+  border-radius: var(--bs-border-radius-lg);
+  box-shadow: var(--td-shadow);
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--td-line);
+  }
+
+  &--low::before {
+    background: var(--td-risk-low);
+  }
+  &--medium::before {
+    background: var(--td-risk-medium);
+  }
+  &--high::before {
+    background: var(--td-risk-high);
+  }
+
+  &--weakest {
+    outline: 2px solid var(--td-risk-high);
+    outline-offset: 2px;
+  }
+
+  &__body {
+    padding: 0.9rem 1rem 0.9rem 1.25rem;
+  }
+
+  &__match {
+    font-size: 0.8rem;
+    color: var(--td-muted);
+  }
+
+  &__pick {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0.15rem 0 0.35rem;
+  }
+
+  &__estimate {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  &__reason {
+    font-size: 0.9rem;
+    margin: 0.5rem 0 0.25rem;
+  }
+
+  &__meta {
+    font-size: 0.75rem;
+    color: var(--td-muted);
+  }
+
+  &__perf {
+    border: 0;
+    border-top: 2px dashed var(--td-line);
+    margin: 0;
+    opacity: 1;
+  }
+
+  &__foot {
+    padding: 0.6rem 1rem 0.75rem 1.25rem;
+    background: var(--td-surface-2);
+    font-size: 0.85rem;
+  }
+}
+
+.td-form {
+  font-family: $font-family-monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+
+  .w {
+    color: var(--td-risk-low);
+  }
+  .d {
+    color: var(--td-muted);
+  }
+  .l {
+    color: var(--td-risk-high);
+  }
+}

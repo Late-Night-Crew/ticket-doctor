@@ -1,0 +1,166 @@
+/**
+ * API contract between the React app and the Go API.
+ * Keep in sync with the Go structs; field names are snake_case on the wire.
+ */
+
+export type MarketKey =
+  | 'HOME_WIN'
+  | 'AWAY_WIN'
+  | 'DRAW'
+  | 'DC_1X'
+  | 'DC_X2'
+  | 'BTTS_YES'
+  | 'BTTS_NO'
+  | 'OVER_1_5'
+  | 'UNDER_1_5'
+  | 'OVER_2_5'
+  | 'UNDER_2_5'
+  | 'OVER_3_5'
+  | 'UNDER_3_5'
+  | 'HOME_TO_SCORE'
+  | 'AWAY_TO_SCORE'
+
+export type RiskBand = 'low' | 'medium' | 'high'
+export type TicketOrigin = 'manual' | 'wizard'
+export type Venue = 'home' | 'away'
+
+export interface League {
+  id: string
+  name: string
+  country: string
+}
+
+export interface Team {
+  id: string
+  name: string
+  /** Last five results, most recent last, e.g. "W-D-L-W-W" (FR-2.4). */
+  form?: string
+}
+
+export interface Fixture {
+  id: string
+  league_id: string
+  /** ISO 8601 kickoff time. */
+  kickoff: string
+  home: Team
+  away: Team
+}
+
+export type FixtureWindow = 'today' | 'weekend' | 'upcoming'
+
+/* ---------- Ticket analysis (FR-4 to FR-6) ---------- */
+
+export interface TicketLegInput {
+  match_id: string
+  market: MarketKey
+  /** Decimal odds entered by the user (FR-3.3). */
+  odds?: number | null
+}
+
+export interface AnalyseRequest {
+  ticket_id: string
+  origin: TicketOrigin
+  legs: TicketLegInput[]
+}
+
+export interface Suggestion {
+  id: string
+  market: MarketKey
+  estimate: number
+  risk_band: RiskBand
+  reason: string
+}
+
+export interface AnalysedLeg {
+  id: string
+  match_id: string
+  fixture: Fixture
+  market: MarketKey
+  odds: number | null
+  /** Model estimate, 0–1. */
+  estimate: number
+  risk_band: RiskBand
+  reason: string
+  /** Smallest sample behind the estimate, and the form window used (NFR-5). */
+  sample_size: number
+  window_n: number
+  low_confidence: boolean
+  /** 1 ÷ odds, when odds were entered (FR-4.4). */
+  implied_prob: number | null
+  is_value: boolean | null
+  suggestions: Suggestion[]
+}
+
+export interface CombinedProbability {
+  probability: number
+  /** Rounded "about 1 in N" (RG-2). */
+  one_in: number
+  /** Product of decimal odds when every leg has odds (FR-6.4). */
+  odds: number | null
+}
+
+export interface AnalyseResponse {
+  ticket_id: string
+  legs: AnalysedLeg[]
+  combined: CombinedProbability
+  weakest_leg_id: string | null
+}
+
+export interface AcceptSuggestionResponse {
+  ok: true
+}
+
+/* ---------- Ticket wizard (FR-8) ---------- */
+
+export type WizardPath = 'beginner' | 'guided'
+export type WizardRisk = 'safe' | 'balanced' | 'bold'
+export type WizardFocus = 'wins' | 'goals' | 'mix'
+
+export interface WizardRequest {
+  path: WizardPath
+  risk: WizardRisk
+  focus: WizardFocus
+  /** Exact number of games wanted: 2–10, or 2–4 on the beginner path. */
+  legs: number
+  when: Exclude<FixtureWindow, 'upcoming'>
+  /** Changes on Regenerate (FR-8.9). */
+  seed: number
+}
+
+export interface WizardLeg {
+  fixture: Fixture
+  market: MarketKey
+  estimate: number
+  risk_band: RiskBand
+  reason: string
+  /** Smallest sample behind the estimate, and the form window used (NFR-5). */
+  sample_size: number
+  window_n: number
+  /** 1 ÷ estimate, the app's own estimate of fair odds. */
+  fair_odds: number
+}
+
+export interface WizardResponse {
+  legs: WizardLeg[]
+  /** Set when fewer legs than asked qualified (rule 4.6.6). */
+  shortfall_reason: string | null
+}
+
+/* ---------- Results log (FR-7) ---------- */
+
+export interface HitCount {
+  won: number
+  lost: number
+}
+
+export interface ResultsRow {
+  league_id: string
+  market: MarketKey
+  original: HitCount
+  suggested: HitCount
+}
+
+export interface ResultsResponse {
+  updated_at: string
+  rows: ResultsRow[]
+}

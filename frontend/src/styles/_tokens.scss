@@ -1,0 +1,44 @@
+// Design tokens as CSS custom properties, so custom components and
+// Bootstrap overrides share one source. Dark values follow data-bs-theme.
+:root,
+[data-bs-theme='light'] {
+  --td-surface: #ffffff;
+  --td-surface-2: #efebe3;
+  --td-ink: #16202a;
+  --td-muted: #5b6670;
+  --td-line: rgba(22, 32, 42, 0.1);
+  --td-brand: #0f5c56;
+  --td-brand-soft: #dcefec;
+
+  --td-risk-low: #1f7a4d;
+  --td-risk-low-bg: #e2f3e9;
+  --td-risk-medium: #8a5a10;
+  --td-risk-medium-bg: #fbefd9;
+  --td-risk-high: #b4382c;
+  --td-risk-high-bg: #fbe4e1;
+  --td-value: #2f6f9f;
+
+  --td-shadow: 0 1px 2px rgba(22, 32, 42, 0.06), 0 4px 16px rgba(22, 32, 42, 0.05);
+  --td-nav-height: 4rem;
+  --td-tap: 2.75rem; // 44px minimum touch target
+}
+
+[data-bs-theme='dark'] {
+  --td-surface: #182129;
+  --td-surface-2: #1f2a33;
+  --td-ink: #e6e9ec;
+  --td-muted: #9aa5ae;
+  --td-line: rgba(230, 233, 236, 0.12);
+  --td-brand: #6fd1c5;
+  --td-brand-soft: #173a37;
+
+  --td-risk-low: #6fd39c;
+  --td-risk-low-bg: #16352a;
+  --td-risk-medium: #f0b65a;
+  --td-risk-medium-bg: #3a2c13;
+  --td-risk-high: #f08a7e;
+  --td-risk-high-bg: #3d1d19;
+  --td-value: #7cb8e6;
+
+  --td-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

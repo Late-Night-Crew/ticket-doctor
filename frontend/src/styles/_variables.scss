@@ -1,0 +1,58 @@
+// Bootstrap variable overrides: Ticket Doctor theme.
+// Brand: a calm "clinic" teal on warm paper, with ink text.
+
+$td-teal: #0f5c56;
+$td-teal-bright: #14857c;
+$td-ink: #16202a;
+$td-paper: #f7f4ee;
+$td-amber: #b7791f;
+$td-red: #b4382c;
+$td-green: #1f7a4d;
+
+$primary: $td-teal;
+$secondary: #5b6670;
+$success: $td-green;
+$warning: $td-amber;
+// Darker than the risk red so text on alert backgrounds passes 4.5:1.
+$danger: #a3302a;
+$info: #2f6f9f;
+$dark: $td-ink;
+
+$body-bg: $td-paper;
+$body-color: $td-ink;
+$body-secondary-color: #5b6670;
+
+// Dark mode
+$body-bg-dark: #10171d;
+$body-color-dark: #e6e9ec;
+$primary-text-emphasis-dark: #6fd1c5;
+
+$font-family-sans-serif: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', 'Noto Sans', Arial, sans-serif;
+$font-family-monospace: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+$headings-font-weight: 700;
+$headings-letter-spacing: -0.01em;
+$lead-font-weight: 400;
+
+$border-radius: 0.625rem;
+$border-radius-sm: 0.4rem;
+$border-radius-lg: 0.875rem;
+$border-radius-pill: 50rem;
+
+$btn-padding-y: 0.625rem;
+$btn-padding-x: 1.125rem;
+$btn-font-weight: 600;
+$input-padding-y: 0.625rem;
+
+$card-border-color: rgba($td-ink, 0.08);
+$card-cap-bg: transparent;
+$card-spacer-y: 1rem;
+$card-spacer-x: 1rem;
+
+$navbar-padding-y: 0.75rem;
+$enable-shadows: false;
+$enable-negative-margins: true;
+$link-decoration: none;
+$link-hover-decoration: underline;
+
+$offcanvas-border-width: 0;
+$modal-content-border-width: 0;

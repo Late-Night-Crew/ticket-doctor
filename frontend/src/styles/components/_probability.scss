@@ -1,0 +1,38 @@
+.td-prob {
+  &__value {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  &__words {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--td-muted);
+  }
+
+  &__bar {
+    height: 0.6rem;
+    border-radius: $border-radius-pill;
+    background: var(--td-surface-2);
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--td-brand);
+    transition: width 0.4s ease;
+  }
+
+  &__fill--low {
+    background: var(--td-risk-low);
+  }
+  &__fill--medium {
+    background: var(--td-risk-medium);
+  }
+  &__fill--high {
+    background: var(--td-risk-high);
+  }
+}
