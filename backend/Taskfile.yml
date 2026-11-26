@@ -1,0 +1,53 @@
+# https://taskfile.dev, run "task" to list tasks.
+version: "3"
+
+vars:
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo dev
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  dev:
+    desc: Run the API locally (uses config.yaml if present)
+    cmds: [go run . server]
+
+  build:
+    desc: Build the ticketdoctor binary
+    cmds:
+      - go build -trimpath -ldflags "-s -w -X ticketdoctor/cmd.version={{.VERSION}}" -o ticketdoctor .
+
+  test:
+    desc: Run all tests with the race detector
+    cmds: [go test -race ./...]
+
+  check:
+    desc: Everything CI runs (format, tidy, vet, test, build)
+    cmds:
+      - 'test -z "$(gofmt -l .)" || (gofmt -l . && echo "Unformatted files above; run task fmt" && exit 1)'
+      - go mod tidy -diff
+      - go vet ./...
+      - go test -race ./...
+      - go build ./...
+
+  fmt:
+    desc: Format all Go files
+    cmds: [gofmt -w .]
+
+  migrate:
+    desc: Apply database migrations
+    cmds: [go run . migrate]
+
+  db:up:
+    desc: Start the local Postgres (docker compose)
+    cmds: [docker compose up -d --wait]
+
+  db:down:
+    desc: Stop the local Postgres (data kept)
+    cmds: [docker compose down]
+
+  db:reset:
+    desc: Delete the local database and start fresh
+    cmds: [docker compose down -v, docker compose up -d --wait]

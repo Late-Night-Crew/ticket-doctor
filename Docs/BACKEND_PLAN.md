@@ -86,11 +86,12 @@ Market values are stored as the same keys as the frontend (`HOME_WIN`, `OVER_2_5
 
 Each milestone ends with green CI and a pull request.
 
-**B0 Skeleton (half a day)**
+**B0 Skeleton: done 2026-11-26**
 - `go.mod` (module `ticketdoctor`), `main.go`, `cmd/root|server|migrate`, config, logging, problemdetail, `GET /api/health`.
 - `Taskfile.yml`, `config.example.yaml`.
 - **`.github/workflows/backend.yml`**: `setup-go`, `go vet`, `go test`, `go build`. This is the CI exercise for you.
 - Done when `ticketdoctor server` answers `/api/health` and CI is green.
+- Also added: `docker-compose.yml` (local Postgres on port 55432), graceful shutdown on SIGTERM, request logging with request IDs, and CORS from config. Config works on environment variables alone, with no file needed on Render. The frontend now reads problem-detail `detail` messages, and the mock API returns the same format.
 
 **B1 Rules engine (SRS M2), no database needed**
 - Port `scorer.ts` to `engine/`: profile maths, estimates (4.1 + A1), bands (4.2), swaps (4.3 + A2), combined and value (4.5), wizard (4.6 + A4), and **settle(market, goals) → won/lost**.

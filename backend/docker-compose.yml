@@ -1,0 +1,22 @@
+# Local development database (production uses Supabase).
+#   task db:up     start it      task db:down   stop it (data is kept in a volume)
+# Matches the default URL in config.example.yaml.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ticketdoctor
+      POSTGRES_PASSWORD: ticketdoctor
+      POSTGRES_DB: ticketdoctor
+    ports:
+      - "127.0.0.1:55432:5432" # not 5432, so it doesn't clash with a Postgres already installed
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketdoctor"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:

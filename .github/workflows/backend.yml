@@ -1,0 +1,92 @@
+# Backend CI. Same shape as frontend.yml (trigger, then one job, then steps); the
+# differences are commented. Compare the two files side by side.
+
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Format, vet, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      # Go instead of Node. go-version-file reads the version from go.mod, so CI
+      # always uses the same Go version as the project (no number to keep in sync).
+      # The cache keeps downloaded modules and build output between runs.
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # gofmt -l lists files that aren't formatted. Go has one official style,
+      # so CI fails if any file differs from it. Fix locally with: task fmt
+      - name: Check formatting
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt (run: task fmt):"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      # Fails if go.mod / go.sum don't match the imports (like npm ci and the
+      # lockfile): someone forgot to run go mod tidy.
+      - name: Check go.mod is tidy
+        run: go mod tidy -diff
+
+      # go vet finds likely bugs the compiler allows (wrong printf verbs, copied locks...).
+      - name: Vet
+        run: go vet ./...
+
+      # -race detects data races between goroutines, important in a web server.
+      - name: Test
+        run: go test -race ./...
+
+      - name: Build
+        run: go build -trimpath -ldflags "-X ticketdoctor/cmd.version=${{ github.sha }}" -o ticketdoctor .
+
+      # The binary is tiny and the server is quick to start, so prove it really
+      # runs: start it, ask /api/health, stop it. Unit tests can't catch a
+      # broken main or command wiring; this can.
+      - name: Smoke test
+        run: |
+          TD_PORT=8099 ./ticketdoctor server &
+          pid=$!
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8099/api/health; then
+              echo
+              kill -TERM "$pid"
+              wait "$pid"
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "server did not answer /api/health"
+          kill "$pid" || true
+          exit 1

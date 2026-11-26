@@ -2,7 +2,19 @@
 
 Go API for Ticket Doctor. It has the same layout as the Late Night Crew School Management System backend (and parrot), so it should feel familiar. The plan is in [../Docs/BACKEND_PLAN.md](../Docs/BACKEND_PLAN.md).
 
-> Status: **scaffold only.** The folders exist with a `doc.go` describing each package; no code yet.
+> Status: **B0 done.** CLI (`server`, `migrate`), config, logging, problem details, `GET /api/health`, CI. Other packages are placeholders with a `doc.go`.
+
+## Run it
+
+```bash
+cd backend
+task db:up        # local Postgres in Docker (port 55432)
+task migrate      # apply migrations (none yet in B0)
+task dev          # API on http://127.0.0.1:8080, try /api/health
+task check        # everything CI runs
+```
+
+There's no need for a `config.yaml`: defaults work locally. Copy `config.example.yaml` to `config.yaml` to change settings. Secrets go in environment variables (`TD_DATABASE_URL`).
 
 ## Layout
 

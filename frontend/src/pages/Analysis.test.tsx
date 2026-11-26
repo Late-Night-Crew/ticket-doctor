@@ -135,7 +135,11 @@ describe('Analysis screen (FR-4 to FR-6)', () => {
   })
 
   it('shows the API error message', async () => {
-    server.use(http.post('*/api/tickets/analyse', () => HttpResponse.json({ error: 'Only one leg per match.' }, { status: 422 })))
+    server.use(
+      http.post('*/api/tickets/analyse', () =>
+        HttpResponse.json({ type: 'about:blank', title: 'Unprocessable Entity', status: 422, detail: 'Only one leg per match.' }, { status: 422 }),
+      ),
+    )
     seed([riskyLeg()])
     renderAnalysis()
     expect(await screen.findByText('Only one leg per match.')).toBeInTheDocument()
