@@ -19,8 +19,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     let message = res.statusText
     try {
-      const body = (await res.json()) as { error?: string }
-      if (body.error) message = body.error
+      // The Go API sends RFC 7807 problem details ({ title, status, detail });
+      // "error" is accepted too for older responses.
+      const body = (await res.json()) as { detail?: string; error?: string }
+      message = body.detail || body.error || message
     } catch {
       /* non-JSON error body */
     }

@@ -20,6 +20,14 @@ import {
 } from './scorer'
 
 const API = '*/api'
+
+/** Errors in the same RFC 7807 shape as the Go API (pkg/problemdetail). */
+function problem(status: number, detail: string) {
+  return HttpResponse.json(
+    { type: 'about:blank', title: status === 404 ? 'Not Found' : 'Unprocessable Entity', status, detail },
+    { status, headers: { 'Content-Type': 'application/problem+json' } },
+  )
+}
 const LATENCY = 250
 
 let legSeq = 0
@@ -41,12 +49,12 @@ export const handlers = [
     const body = (await request.json()) as AnalyseRequest
 
     if (!body.legs?.length || body.legs.length > RULES.maxLegs) {
-      return HttpResponse.json({ error: `A ticket holds 1–${RULES.maxLegs} legs.` }, { status: 422 })
+      return problem(422, `A ticket holds 1–${RULES.maxLegs} legs.`)
     }
     const seen = new Set<string>()
     for (const l of body.legs) {
       if (seen.has(l.match_id)) {
-        return HttpResponse.json({ error: 'Only one leg per match.' }, { status: 422 })
+        return problem(422, 'Only one leg per match.')
       }
       seen.add(l.match_id)
     }
@@ -54,7 +62,7 @@ export const handlers = [
     const legs: AnalysedLeg[] = []
     for (const input of body.legs) {
       const fixture = fixtureById(input.match_id)
-      if (!fixture) return HttpResponse.json({ error: `Unknown match ${input.match_id}` }, { status: 404 })
+      if (!fixture) return problem(404, `Unknown match ${input.match_id}`)
       const { home, away } = profilesFor(fixture)
       const e = estimateMarket(input.market, home, away)
       const id = `leg-${++legSeq}`

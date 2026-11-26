@@ -6,7 +6,7 @@ A web app that reviews a football bet ticket leg by leg, flags risky picks, and 
 |---|---|
 | [`Docs/`](Docs) | The SRS (PDF), the [SRS addendum](Docs/SRS_ADDENDUM.md) with agreed changes and V2, and the [frontend plan](Docs/FRONTEND_PLAN.md) |
 | [`frontend/`](frontend) | React (Vite and TypeScript), Bootstrap and custom CSS. Runs on a mock API until the Go backend exists. See [frontend/README.md](frontend/README.md) |
-| `backend/` | Go API (next milestone) |
+| [`backend/`](backend) | Go API, scaffolded with the same layout as the Late Night Crew backend. Plan: [Docs/BACKEND_PLAN.md](Docs/BACKEND_PLAN.md) |
 
 ## Quick start
 

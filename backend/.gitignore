@@ -1,0 +1,9 @@
+# Local config holds secrets; config.example.yaml is the committed template
+config.yaml
+
+# Built binary
+/ticketdoctor
+
+# Local logs and files
+data/*
+!data/.gitkeep
