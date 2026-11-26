@@ -40,6 +40,28 @@ jobs:
       run:
         working-directory: backend
 
+    # A service container: GitHub starts this Postgres next to the job and
+    # throws it away afterwards, so the database tests run against a real,
+    # empty database on every run. (Locally: TD_TEST_DATABASE_URL, see db/dbtest.)
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ticketdoctor
+          POSTGRES_PASSWORD: ticketdoctor
+          POSTGRES_DB: ticketdoctor_test
+        ports:
+          - 5432:5432
+        # Wait until Postgres accepts connections before the steps start.
+        options: >-
+          --health-cmd "pg_isready -U ticketdoctor"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+
+    env:
+      TD_TEST_DATABASE_URL: postgres://ticketdoctor:ticketdoctor@localhost:5432/ticketdoctor_test?sslmode=disable
+
     steps:
       - name: Check out code
         uses: actions/checkout@v7
@@ -71,11 +93,23 @@ jobs:
       - name: Check go.mod is tidy
         run: go mod tidy -diff
 
+      # The Go code in database/dbsqlc is generated from query.sql and the
+      # migrations. "sqlc diff" fails if someone changed the SQL but forgot to
+      # regenerate (fix locally with: task sqlc).
+      - name: Set up sqlc
+        uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: '1.30.0'
+
+      - name: Check generated database code is up to date
+        run: sqlc diff
+
       # go vet finds likely bugs the compiler allows (wrong printf verbs, copied locks...).
       - name: Vet
         run: go vet ./...
 
       # -race detects data races between goroutines, important in a web server.
+      # Includes the database tests, using the Postgres service above.
       - name: Test
         run: go test -race ./...
 

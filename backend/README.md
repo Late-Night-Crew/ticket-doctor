@@ -2,7 +2,7 @@
 
 Go API for Ticket Doctor. It has the same layout as the Late Night Crew School Management System backend (and parrot), so it should feel familiar. The plan is in [../Docs/BACKEND_PLAN.md](../Docs/BACKEND_PLAN.md).
 
-> Status: **B0 done.** CLI (`server`, `migrate`), config, logging, problem details, `GET /api/health`, CI. Other packages are placeholders with a `doc.go`.
+> Status: **B0, B1 and B2 (results) done.** CLI (`server`, `migrate`, `import`), rules engine, database schema, results import and team profiles. Upcoming fixtures and the ticket endpoints are next (see the plan).
 
 ## Run it
 
@@ -13,9 +13,24 @@ cd backend
 psql -U postgres -h localhost -c "CREATE DATABASE ticketdoctor"   # once
 cp config.example.yaml config.yaml                                  # once; fill in the password
 task migrate      # apply migrations
+task import       # download results for the 3 leagues, rebuild team profiles (~5 s)
 task dev          # API on http://127.0.0.1:8080, try /api/health
 task check        # everything CI runs
 ```
+
+`task import -- --league epl --season 2627` imports one league or season; `--from-dir` reads CSVs from disk instead of downloading. Re-running is safe: unchanged matches are left alone, and every run is recorded in `import_runs`.
+
+### Database tests
+
+Tests that need Postgres use a separate database and are skipped unless `TD_TEST_DATABASE_URL` is set. CI always runs them, against a Postgres service container.
+
+```bash
+psql -U postgres -h localhost -c "CREATE DATABASE ticketdoctor_test"   # once
+export TD_TEST_DATABASE_URL="postgres://postgres:PASSWORD@localhost:5432/ticketdoctor_test?sslmode=disable"
+task test
+```
+
+Never point it at your development database: the tests empty the tables.
 
 `config.yaml` is gitignored, so the password stays on your machine. No local Postgres? `task db:up` starts one in Docker on port 55432 (see `config.example.yaml`). Supabase comes in B5, through `TD_DATABASE_URL`.
 

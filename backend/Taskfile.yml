@@ -20,7 +20,7 @@ tasks:
       - go build -trimpath -ldflags "-s -w -X ticketdoctor/cmd.version={{.VERSION}}" -o ticketdoctor .
 
   test:
-    desc: Run all tests with the race detector
+    desc: Run all tests with the race detector (database tests need TD_TEST_DATABASE_URL)
     cmds: [go test -race ./...]
 
   check:
@@ -28,9 +28,18 @@ tasks:
     cmds:
       - 'test -z "$(gofmt -l .)" || (gofmt -l . && echo "Unformatted files above; run task fmt" && exit 1)'
       - go mod tidy -diff
+      - sqlc diff
       - go vet ./...
       - go test -race ./...
       - go build ./...
+
+  sqlc:
+    desc: Regenerate database/dbsqlc from query.sql and the migrations
+    cmds: [sqlc generate]
+
+  import:
+    desc: Import results and rebuild profiles (add args after --, e.g. task import -- --league epl)
+    cmds: ['go run . import {{.CLI_ARGS}}']
 
   fmt:
     desc: Format all Go files
