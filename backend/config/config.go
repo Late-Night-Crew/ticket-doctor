@@ -16,6 +16,8 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
+
+	"ticketdoctor/engine"
 )
 
 const (
@@ -30,6 +32,48 @@ type Config struct {
 	Server      ServerConfig   `mapstructure:"server"`
 	Database    DatabaseConfig `mapstructure:"database"`
 	Logging     LoggingConfig  `mapstructure:"logging"`
+	// Rules holds the rule thresholds (NFR-6). Defaults are the SRS values.
+	Rules RulesConfig `mapstructure:"rules"`
+}
+
+// RulesConfig mirrors engine.Thresholds with config file names. Change these
+// with care: they change every estimate and suggestion the app makes.
+type RulesConfig struct {
+	FormWindow         int     `mapstructure:"form_window"`
+	LowConfidenceBelow int     `mapstructure:"low_confidence_below"`
+	LowFrom            float64 `mapstructure:"low_from"`
+	MediumFrom         float64 `mapstructure:"medium_from"`
+	SwapMinGain        float64 `mapstructure:"swap_min_gain"`
+	MaxSuggestions     int     `mapstructure:"max_suggestions"`
+	ValueMargin        float64 `mapstructure:"value_margin"`
+	BoldFloor          float64 `mapstructure:"bold_floor"`
+}
+
+// Thresholds converts the config section for the engine.
+func (r RulesConfig) Thresholds() engine.Thresholds {
+	return engine.Thresholds{
+		FormWindow:         r.FormWindow,
+		LowConfidenceBelow: r.LowConfidenceBelow,
+		LowFrom:            r.LowFrom,
+		MediumFrom:         r.MediumFrom,
+		SwapMinGain:        r.SwapMinGain,
+		MaxSuggestions:     r.MaxSuggestions,
+		ValueMargin:        r.ValueMargin,
+		BoldFloor:          r.BoldFloor,
+	}
+}
+
+func rulesFrom(t engine.Thresholds) RulesConfig {
+	return RulesConfig{
+		FormWindow:         t.FormWindow,
+		LowConfidenceBelow: t.LowConfidenceBelow,
+		LowFrom:            t.LowFrom,
+		MediumFrom:         t.MediumFrom,
+		SwapMinGain:        t.SwapMinGain,
+		MaxSuggestions:     t.MaxSuggestions,
+		ValueMargin:        t.ValueMargin,
+		BoldFloor:          t.BoldFloor,
+	}
 }
 
 type ServerConfig struct {
@@ -115,6 +159,7 @@ func Defaults() *Config {
 		},
 		Database: DatabaseConfig{Port: 5432, Sslmode: "disable", MaxConns: 5},
 		Logging:  LoggingConfig{Level: "info", Format: "text"},
+		Rules:    rulesFrom(engine.DefaultThresholds()),
 	}
 }
 
@@ -224,6 +269,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Database.MaxConns < 1 {
 		problems = append(problems, "database max_conns must be at least 1")
+	}
+	if err := c.Rules.Thresholds().Validate(); err != nil {
+		problems = append(problems, "rules: "+strings.ReplaceAll(err.Error(), "\n", "; "))
 	}
 	if c.IsProduction() {
 		if c.Database.ConnString() == "" {
