@@ -188,7 +188,7 @@ Each milestone ends with green CI and a pull request.
     - Another project's free database took the workspace's only free slot, so it was deleted.
 - **Left before calling B5 done:** three days of scheduled imports without errors, and a decision on hosting before the database expires (~27 December).
 
-**B6 Admin (F7)**: backend done 2026-11-27; the admin pages are F7.
+**B6 Admin (F7)**: done 2026-11-27, backend and pages. It goes live with v0.5.0 once `TD_ADMIN_SESSION_SECRET` is set (DEPLOY.md).
 - **Accounts:** a `users` table holding a username, a bcrypt hash and a role (only `admin` for now). No email or other personal data. No sign-up page: `ticketdoctor admin create|password|disable|enable|list` manages accounts, with passwords typed at a hidden prompt.
 - **Sessions:** an HS256 JWT signed with `TD_ADMIN_SESSION_SECRET`, as in parrot, carried in an HttpOnly, SameSite=Strict cookie limited to `/api/admin`.
   - A changed password or a disabled account ends sessions at once.

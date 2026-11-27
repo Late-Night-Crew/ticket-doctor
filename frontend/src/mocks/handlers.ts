@@ -8,6 +8,7 @@ import type {
   WizardResponse,
 } from '../api/types'
 import { RULES } from '../config/rules'
+import { adminHandlers } from './admin'
 import { fixtureById, fixturesIn, LEAGUES, profilesFor, seeded } from './data'
 import {
   buildWizardTicket,
@@ -33,6 +34,7 @@ const LATENCY = 250
 let legSeq = 0
 
 export const handlers = [
+  ...adminHandlers,
   http.get(`${API}/leagues`, async () => {
     await delay(LATENCY)
     return HttpResponse.json(LEAGUES)

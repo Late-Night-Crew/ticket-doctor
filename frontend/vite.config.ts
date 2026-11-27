@@ -28,6 +28,13 @@ function dropMockWorker(useMocks: boolean): Plugin {
 }
 
 export default defineConfig(({ command, mode }) => ({
+  // VITE_API_PROXY=http://localhost:8080 sends /api to a local Go API, so the
+  // app and API share an origin as on Render (needed for the admin cookie).
+  server: {
+    proxy: loadEnv(mode, process.cwd(), 'VITE_').VITE_API_PROXY
+      ? { '/api': loadEnv(mode, process.cwd(), 'VITE_').VITE_API_PROXY }
+      : undefined,
+  },
   // Read .env files too, so a mock-enabled preview deploy keeps its worker.
   plugins: [react(), dropMockWorker(loadEnv(mode, process.cwd(), 'VITE_').VITE_USE_MOCKS === 'true')],
   css: {

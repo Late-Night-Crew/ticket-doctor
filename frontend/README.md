@@ -15,6 +15,8 @@ npm run build
 
 When the Go API is up, set `VITE_USE_MOCKS=false` and point `VITE_API_URL` at it (see `.env.example`).
 
+The admin pages (`/admin`, B6) sign in with a cookie, which needs the app and API on one address. Against a local Go API, leave `VITE_API_URL` empty and set `VITE_API_PROXY=http://localhost:8080` so Vite forwards `/api` to it. With mocks on, sign in as `admin` / `mock password 123`.
+
 During development, open `/dev/styleguide` to see the shared components.
 
 ## Layout

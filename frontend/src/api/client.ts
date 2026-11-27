@@ -28,8 +28,13 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(res.status, message)
   }
+  // 204 No Content (e.g. admin sign-out, saving a result) has no body.
+  if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
 export const post = <T>(path: string, body: unknown) =>
   api<T>(path, { method: 'POST', body: JSON.stringify(body) })
+
+export const put = <T>(path: string, body: unknown) =>
+  api<T>(path, { method: 'PUT', body: JSON.stringify(body) })
