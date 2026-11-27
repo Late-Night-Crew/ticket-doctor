@@ -15,6 +15,8 @@ export const RULES = {
     maxSuggestions: 2,
   },
   valueMargin: 0.05,
+  /** No estimate goes above this: a perfect record isn't a certainty (agreed 2026-11-27). */
+  maxEstimate: 0.95,
   maxLegs: 15,
   wizard: {
     boldFloor: 0.35,

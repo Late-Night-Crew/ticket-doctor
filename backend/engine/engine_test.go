@@ -197,4 +197,11 @@ func TestThresholds(t *testing.T) {
 	if e.Thresholds().LowFrom != 0.8 {
 		t.Error("Thresholds() should return the engine's thresholds")
 	}
+	for _, max := range []float64{0.6, 1.01} { // at or below low_from, or above 1
+		capped := DefaultThresholds()
+		capped.MaxEstimate = max
+		if err := capped.Validate(); err == nil || !strings.Contains(err.Error(), "max estimate") {
+			t.Errorf("max estimate %.2f: err = %v", max, err)
+		}
+	}
 }

@@ -76,6 +76,10 @@ Agreed 2026-11-27. With no accounts, every tap of **Analyse** sends the whole ti
 
 The row per ticket and match (the user's pick, the suggestions shown, the final pick) is also what V2's saved tickets need (FR-9.3).
 
+### A7. Estimates are capped at 95% (amends 4.1)
+
+Agreed 2026-11-27. After any formula in 4.1 (and A1), an estimate is limited to **95%** (`max_estimate`, NFR-6). A team that scored in all of its last 10 home games has a strong record, not a certain result, and showing 100% would read as a guarantee (RG-1). The reason sentence still gives the real record ("scored in 10 of last 10 home games"). The capped value is used everywhere: risk bands, swaps, combined chance, fair odds and the wizard.
+
 ---
 
 ## B. Version 2: saved tickets and pick comparison
