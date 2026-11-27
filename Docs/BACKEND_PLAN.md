@@ -162,7 +162,7 @@ Each milestone ends with green CI and a pull request.
 
 **Release process (added 2026-11-26).** Tag-based releases are in place: `v0.1.0` exists, and `release.yml` checks the tagged commit, builds `ghcr.io/late-night-crew/ticket-doctor-api:<tag>` and creates the GitHub Release. See [RELEASING.md](../RELEASING.md). Every migration from B2 on must follow its backward-compatibility rule.
 
-**B5 Go live (SRS M4): code done 2026-11-27; setup in [DEPLOY.md](DEPLOY.md)**
+**B5 Go live (SRS M4): live 2026-11-27 at https://ticket-doctor.onrender.com (`v0.4.0`); setup in [DEPLOY.md](DEPLOY.md)**
 - Done when production serves real fixtures and the import has run three days without errors.
 - **Decided 2026-11-27: everything on Render**, in Frankfurt, closest to Malawi (D2 changed). Free Postgres expires after 30 days, which is enough for the trial period; after it, decide on a paid plan with real usage data.
 - **`render.yaml` (Blueprint):**
@@ -180,6 +180,13 @@ Each milestone ends with green CI and a pull request.
 - **`import.yml`:** twice a day (04:15 and 22:15 UTC), it runs `migrate` then `import` from the **latest release's image**, never unreleased code. It skips with a notice until `TD_DATABASE_URL` exists.
 - **Repository made public** 2026-11-27, after checking every commit on every branch for the API key and database password (none found).
 - **Removed:** `frontend/vercel.json` and every Supabase reference.
+- **Went live 2026-11-27:**
+  - **First import:** 1,395 results, 67 teams, 134 profiles, 73 fixtures (all clubs matched).
+  - **Deploy path tested end to end:** Release for `v0.4.0` deployed both services through Render's API and confirmed the live site reports `v0.4.0`. The Render key has Deploys permission only.
+  - **Setup snags, now in DEPLOY.md:**
+    - The organisation had to allow public packages first.
+    - Another project's free database took the workspace's only free slot, so it was deleted.
+- **Left before calling B5 done:** three days of scheduled imports without errors, and a decision on hosting before the database expires (~27 December).
 
 **B6 Admin (F7)**
 - Manual result entry, threshold view.
