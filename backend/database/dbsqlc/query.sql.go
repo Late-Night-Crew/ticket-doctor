@@ -188,6 +188,72 @@ func (q *Queries) CountSettledSuggestions(ctx context.Context, arg CountSettledS
 	return items, nil
 }
 
+const createUser = `-- name: CreateUser :one
+
+INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, password_hash, role, password_changed_at, disabled, last_login_at, created_at
+`
+
+type CreateUserParams struct {
+	Username     string
+	PasswordHash string
+}
+
+// ---------- admin (B6) ----------
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.PasswordChangedAt,
+		&i.Disabled,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const dashboardCounts = `-- name: DashboardCounts :one
+SELECT
+  (SELECT count(*) FROM matches WHERE status = 'scheduled' AND kickoff >= $1::timestamptz) AS upcoming,
+  (SELECT count(*) FROM matches WHERE status IN ('scheduled', 'postponed') AND kickoff < $1::timestamptz) AS awaiting_result,
+  (SELECT count(*) FROM matches WHERE status = 'finished') AS finished,
+  (SELECT count(DISTINCT ticket_id) FROM analysed_legs) AS tickets,
+  (SELECT count(DISTINCT ticket_id) FROM analysed_legs WHERE created_at >= $1::timestamptz - interval '7 days') AS tickets_7d,
+  (SELECT count(*) FROM analysed_legs WHERE on_ticket) AS legs,
+  (SELECT count(*) FROM suggestions s JOIN analysed_legs l ON l.id = s.analysed_leg_id WHERE l.on_ticket) AS suggestions,
+  (SELECT count(*) FROM suggestions s JOIN analysed_legs l ON l.id = s.analysed_leg_id WHERE l.on_ticket AND s.accepted) AS accepted
+`
+
+type DashboardCountsRow struct {
+	Upcoming       int64
+	AwaitingResult int64
+	Finished       int64
+	Tickets        int64
+	Tickets7d      int64
+	Legs           int64
+	Suggestions    int64
+	Accepted       int64
+}
+
+func (q *Queries) DashboardCounts(ctx context.Context, now time.Time) (DashboardCountsRow, error) {
+	row := q.db.QueryRow(ctx, dashboardCounts, now)
+	var i DashboardCountsRow
+	err := row.Scan(
+		&i.Upcoming,
+		&i.AwaitingResult,
+		&i.Finished,
+		&i.Tickets,
+		&i.Tickets7d,
+		&i.Legs,
+		&i.Suggestions,
+		&i.Accepted,
+	)
+	return i, err
+}
+
 const deleteLegSuggestions = `-- name: DeleteLegSuggestions :exec
 DELETE FROM suggestions WHERE analysed_leg_id = $1
 `
@@ -236,6 +302,33 @@ func (q *Queries) GetLeague(ctx context.Context, id string) (League, error) {
 		&i.FdCode,
 		&i.CreatedAt,
 		&i.FdoCode,
+	)
+	return i, err
+}
+
+const getMatchForUpdate = `-- name: GetMatchForUpdate :one
+SELECT id, league_id, kickoff, status, home_goals, away_goals FROM matches WHERE id = $1 FOR UPDATE
+`
+
+type GetMatchForUpdateRow struct {
+	ID        int64
+	LeagueID  string
+	Kickoff   time.Time
+	Status    string
+	HomeGoals *int16
+	AwayGoals *int16
+}
+
+func (q *Queries) GetMatchForUpdate(ctx context.Context, id int64) (GetMatchForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getMatchForUpdate, id)
+	var i GetMatchForUpdateRow
+	err := row.Scan(
+		&i.ID,
+		&i.LeagueID,
+		&i.Kickoff,
+		&i.Status,
+		&i.HomeGoals,
+		&i.AwayGoals,
 	)
 	return i, err
 }
@@ -293,6 +386,72 @@ func (q *Queries) GetMatchesByIDs(ctx context.Context, ids []int64) ([]GetMatche
 		return nil, err
 	}
 	return items, nil
+}
+
+const getUser = `-- name: GetUser :one
+SELECT id, username, password_hash, role, password_changed_at, disabled, last_login_at, created_at FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
+	row := q.db.QueryRow(ctx, getUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.PasswordChangedAt,
+		&i.Disabled,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, password_hash, role, password_changed_at, disabled, last_login_at, created_at FROM users WHERE username = $1
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.PasswordHash,
+		&i.Role,
+		&i.PasswordChangedAt,
+		&i.Disabled,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertResultEntry = `-- name: InsertResultEntry :exec
+INSERT INTO result_entries (match_id, user_id, home_goals, away_goals, previous_home, previous_away)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertResultEntryParams struct {
+	MatchID      int64
+	UserID       int64
+	HomeGoals    int16
+	AwayGoals    int16
+	PreviousHome *int16
+	PreviousAway *int16
+}
+
+func (q *Queries) InsertResultEntry(ctx context.Context, arg InsertResultEntryParams) error {
+	_, err := q.db.Exec(ctx, insertResultEntry,
+		arg.MatchID,
+		arg.UserID,
+		arg.HomeGoals,
+		arg.AwayGoals,
+		arg.PreviousHome,
+		arg.PreviousAway,
+	)
+	return err
 }
 
 const insertTeam = `-- name: InsertTeam :one
@@ -366,6 +525,72 @@ func (q *Queries) LastSuccessfulImport(ctx context.Context) (*time.Time, error) 
 	var finished_at *time.Time
 	err := row.Scan(&finished_at)
 	return finished_at, err
+}
+
+const listAdminMatches = `-- name: ListAdminMatches :many
+SELECT m.id, m.league_id, m.kickoff, m.status, m.home_goals, m.away_goals, m.source,
+       h.name AS home_name, a.name AS away_name
+FROM matches m
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE ($1::text IS NULL OR m.league_id = $1::text)
+  AND CASE WHEN $2::boolean
+           THEN m.status IN ('scheduled', 'postponed') AND m.kickoff < $3::timestamptz
+           ELSE m.status = 'finished' AND m.kickoff >= $3::timestamptz - interval '14 days'
+      END
+ORDER BY CASE WHEN $2::boolean THEN m.kickoff END ASC,
+         m.kickoff DESC, m.id
+LIMIT 300
+`
+
+type ListAdminMatchesParams struct {
+	LeagueID *string
+	Awaiting bool
+	Now      time.Time
+}
+
+type ListAdminMatchesRow struct {
+	ID        int64
+	LeagueID  string
+	Kickoff   time.Time
+	Status    string
+	HomeGoals *int16
+	AwayGoals *int16
+	Source    string
+	HomeName  string
+	AwayName  string
+}
+
+// Matches for the result entry page. Awaiting: kicked off but no result yet.
+// Recent: finished in the last two weeks, newest first, to correct a score.
+func (q *Queries) ListAdminMatches(ctx context.Context, arg ListAdminMatchesParams) ([]ListAdminMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listAdminMatches, arg.LeagueID, arg.Awaiting, arg.Now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdminMatchesRow{}
+	for rows.Next() {
+		var i ListAdminMatchesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LeagueID,
+			&i.Kickoff,
+			&i.Status,
+			&i.HomeGoals,
+			&i.AwayGoals,
+			&i.Source,
+			&i.HomeName,
+			&i.AwayName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listFinishedMatchesByLeague = `-- name: ListFinishedMatchesByLeague :many
@@ -464,6 +689,37 @@ func (q *Queries) ListFixtures(ctx context.Context, arg ListFixturesParams) ([]L
 			&i.AwayID,
 			&i.AwayName,
 			&i.AwayForm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listImportRuns = `-- name: ListImportRuns :many
+SELECT id, started_at, finished_at, status, summary, error FROM import_runs ORDER BY started_at DESC LIMIT $1
+`
+
+func (q *Queries) ListImportRuns(ctx context.Context, limit int32) ([]ImportRun, error) {
+	rows, err := q.db.Query(ctx, listImportRuns, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ImportRun{}
+	for rows.Next() {
+		var i ImportRun
+		if err := rows.Scan(
+			&i.ID,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.Status,
+			&i.Summary,
+			&i.Error,
 		); err != nil {
 			return nil, err
 		}
@@ -733,6 +989,99 @@ func (q *Queries) ListTicketLegs(ctx context.Context, ticketID string) ([]Analys
 		return nil, err
 	}
 	return items, nil
+}
+
+const listUsers = `-- name: ListUsers :many
+SELECT id, username, password_hash, role, password_changed_at, disabled, last_login_at, created_at FROM users ORDER BY username
+`
+
+func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, listUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.PasswordHash,
+			&i.Role,
+			&i.PasswordChangedAt,
+			&i.Disabled,
+			&i.LastLoginAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordLogin = `-- name: RecordLogin :exec
+UPDATE users SET last_login_at = now() WHERE id = $1
+`
+
+func (q *Queries) RecordLogin(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, recordLogin, id)
+	return err
+}
+
+const setManualResult = `-- name: SetManualResult :exec
+UPDATE matches
+SET status = 'finished', home_goals = $2, away_goals = $3, source = 'manual', updated_at = now()
+WHERE id = $1
+`
+
+type SetManualResultParams struct {
+	ID        int64
+	HomeGoals *int16
+	AwayGoals *int16
+}
+
+func (q *Queries) SetManualResult(ctx context.Context, arg SetManualResultParams) error {
+	_, err := q.db.Exec(ctx, setManualResult, arg.ID, arg.HomeGoals, arg.AwayGoals)
+	return err
+}
+
+const setUserDisabled = `-- name: SetUserDisabled :execrows
+UPDATE users SET disabled = $2 WHERE username = $1
+`
+
+type SetUserDisabledParams struct {
+	Username string
+	Disabled bool
+}
+
+func (q *Queries) SetUserDisabled(ctx context.Context, arg SetUserDisabledParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserDisabled, arg.Username, arg.Disabled)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setUserPassword = `-- name: SetUserPassword :execrows
+UPDATE users SET password_hash = $2, password_changed_at = now() WHERE username = $1
+`
+
+type SetUserPasswordParams struct {
+	Username     string
+	PasswordHash string
+}
+
+func (q *Queries) SetUserPassword(ctx context.Context, arg SetUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserPassword, arg.Username, arg.PasswordHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const startImportRun = `-- name: StartImportRun :one

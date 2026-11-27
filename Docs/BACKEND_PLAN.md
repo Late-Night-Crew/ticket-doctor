@@ -188,9 +188,16 @@ Each milestone ends with green CI and a pull request.
     - Another project's free database took the workspace's only free slot, so it was deleted.
 - **Left before calling B5 done:** three days of scheduled imports without errors, and a decision on hosting before the database expires (~27 December).
 
-**B6 Admin (F7)**
-- Manual result entry, threshold view.
-- After D5 and open question 6.
+**B6 Admin (F7)**: backend done 2026-11-27; the admin pages are F7.
+- **Accounts:** a `users` table holding a username, a bcrypt hash and a role (only `admin` for now). No email or other personal data. No sign-up page: `ticketdoctor admin create|password|disable|enable|list` manages accounts, with passwords typed at a hidden prompt.
+- **Sessions:** an HS256 JWT signed with `TD_ADMIN_SESSION_SECRET`, as in parrot, carried in an HttpOnly, SameSite=Strict cookie limited to `/api/admin`.
+  - A changed password or a disabled account ends sessions at once.
+  - After 10 failed sign-ins, an address is blocked for 15 minutes.
+  - Changes must be sent as JSON, which stops cross-site forms.
+  - In production, admin is off until the secret is set.
+- **Endpoints (`/api/admin`):** `login`, `logout`, `me`, `dashboard`, `matches?view=awaiting|recent`, `PUT matches/:id/result`, `thresholds`.
+- **Manual results (FR-1.4):** only for games that have kicked off. The score is stored with `source = manual`, and each entry, with the score it replaced, is kept in `result_entries`. The results import still wins for leagues it covers. Team profiles pick the result up at the next import.
+- **Thresholds:** read-only, showing each value with its SRS default. They change in config and ship with a release (NFR-6), so every change is reviewed.
 
 ## 6. Decisions needed
 
@@ -200,6 +207,6 @@ Each milestone ends with green CI and a pull request.
 | D2 | ~~Database host~~ | ~~Supabase~~ (2026-11-26). **Changed 2026-11-27: Render Postgres**, next to the API, so everything is in one place. The free database expires after 30 days: upgrade or export the ticket log before then ([DEPLOY.md](DEPLOY.md)) |
 | D3 | ~~Module name~~ | **`ticketdoctor`** (used in B0) |
 | D4 | ~~Fixtures source (FR-1.2)~~ | **Decided 2026-11-27: football-data.org** (free tier, 10 requests a minute). The key goes in `TD_FOOTBALL_DATA_ORG_TOKEN`, or `football_data_org.token` in the untracked `config.yaml`; for B5 it becomes a repository secret for the import cron |
-| D5 | **Admin auth (open question 6)** | Reuse the nsms JWT login with admin users created from config; decide before B6 |
+| D5 | ~~Admin auth (open question 6)~~ | **Decided 2026-11-27:** a `users` table with accounts made from the CLI; the parrot-style JWT goes in an HttpOnly cookie (B6). Public users don't get accounts: V2 saved tickets stay link-based (SRS addendum B3) |
 
 Questions 3, 4 and 10 from the frontend plan were decided on 2026-11-27 (SRS addendum C, A5, A6).

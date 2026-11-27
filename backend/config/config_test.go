@@ -197,3 +197,25 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestAdminSessionSettings(t *testing.T) {
+	cfg := Defaults()
+	if err := cfg.ApplyEnvironment(func(k string) (string, bool) {
+		v, ok := map[string]string{"TD_ADMIN_SESSION_SECRET": strings.Repeat("k", 32)}[k]
+		return v, ok
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Admin.SessionSecret != strings.Repeat("k", 32) || cfg.Admin.SessionHours != 12 {
+		t.Fatalf("admin = %+v", cfg.Admin)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Admin.SessionSecret = "too short"
+	cfg.Admin.SessionHours = 0
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "session_secret") || !strings.Contains(err.Error(), "session_hours") {
+		t.Fatalf("err = %v", err)
+	}
+}

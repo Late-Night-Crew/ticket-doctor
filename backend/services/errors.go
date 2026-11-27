@@ -24,3 +24,6 @@ func AsUserError(err error) (*UserError, bool) {
 	ok := errors.As(err, &ue)
 	return ue, ok
 }
+
+// Unauthorized is a 401 user error: not signed in, or the session has ended.
+func Unauthorized(msg string) error { return &UserError{Status: 401, Msg: msg} }

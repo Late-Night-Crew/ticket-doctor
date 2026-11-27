@@ -2,7 +2,7 @@
 
 Go API for Ticket Doctor. It has the same layout as the Late Night Crew School Management System backend (and parrot), so it should feel familiar. The plan is in [../Docs/BACKEND_PLAN.md](../Docs/BACKEND_PLAN.md).
 
-> Status: **B0 to B3 done.** CLI (`server`, `migrate`, `import`), rules engine, results and fixtures import, team profiles, and every endpoint the frontend uses. Settlement and go-live (B4, B5) are next (see the plan).
+> Status: **B0 to B5 done and live on Render; B6 (admin) backend done.** CLI (`server`, `migrate`, `import`, `admin`), rules engine, results and fixtures import, team profiles, settlement, admin sign-in and result entry, and every endpoint the frontend uses.
 
 ## Run it
 
@@ -28,6 +28,20 @@ The server needs the database. To run the frontend against it instead of the moc
 | `POST /api/suggestions/:id/accept` | Records an accepted swap |
 | `POST /api/wizard` | Builds a ticket from the rules |
 | `GET /api/results?league=&market=` | Track record, including the like-for-like group |
+| `POST /api/admin/login`, `POST /api/admin/logout`, `GET /api/admin/me` | Admin sign-in, using an HttpOnly session cookie |
+| `GET /api/admin/dashboard` | Match, ticket and suggestion counts, plus the last 10 import runs |
+| `GET /api/admin/matches?view=awaiting\|recent&league=` | Games kicked off with no result yet, or finished in the last two weeks |
+| `PUT /api/admin/matches/:id/result` | Enter or correct a final score (FR-1.4) |
+| `GET /api/admin/thresholds` | The rule thresholds in use, with the SRS defaults |
+
+Every `/api/admin` route except login and logout needs a signed-in admin. Accounts are made from the CLI (there is no sign-up page):
+
+```sh
+ticketdoctor admin create joseph     # asks for the password twice
+ticketdoctor admin password joseph   # new password; signs the account out everywhere
+ticketdoctor admin disable joseph    # or enable
+ticketdoctor admin list
+```
 
 POST requests are limited to 30 a minute per IP. Errors are problem details whose `detail` the frontend shows as is.
 
