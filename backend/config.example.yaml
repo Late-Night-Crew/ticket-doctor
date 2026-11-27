@@ -64,3 +64,12 @@ rules:
 football_data_org:
   token: ""
   days_ahead: 14             # covers today, this weekend and next weekend (1-31)
+
+# Admin sign-in (B6). Accounts are made with `ticketdoctor admin create`, not here.
+# session_secret signs sessions: it's a secret, so set TD_ADMIN_SESSION_SECRET
+# (at least 32 characters, e.g. `openssl rand -base64 48`) rather than writing it
+# here. Left empty, development makes a random one each start (you sign in again
+# after a restart) and PRODUCTION turns admin sign-in off.
+admin:
+  session_secret: ""
+  session_hours: 12          # how long a sign-in lasts (1-168)

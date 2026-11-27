@@ -36,7 +36,25 @@ type Config struct {
 	Rules RulesConfig `mapstructure:"rules"`
 	// FootballDataOrg is the upcoming-fixtures source (decision D4).
 	FootballDataOrg FootballDataOrgConfig `mapstructure:"football_data_org"`
+	// Admin configures admin sign-in (B6).
+	Admin AdminConfig `mapstructure:"admin"`
 }
+
+// AdminConfig configures admin sessions. Accounts themselves are made with
+// `ticketdoctor admin create`, never in config.
+type AdminConfig struct {
+	// SessionSecret signs admin sessions; anyone who has it can forge one. Set
+	// it with TD_ADMIN_SESSION_SECRET (at least 32 characters, e.g. from
+	// `openssl rand -base64 48`). Changing it signs every admin out. Without
+	// it, development makes a random one at start-up (sessions end on restart)
+	// and production turns admin sign-in off.
+	SessionSecret string `mapstructure:"session_secret"`
+	// SessionHours is how long a sign-in lasts.
+	SessionHours int `mapstructure:"session_hours"`
+}
+
+// MinSessionSecret is the shortest session secret accepted.
+const MinSessionSecret = 32
 
 // FootballDataOrgConfig configures the fixtures import from football-data.org.
 type FootballDataOrgConfig struct {
@@ -176,6 +194,7 @@ func Defaults() *Config {
 		Logging:         LoggingConfig{Level: "info", Format: "text"},
 		Rules:           rulesFrom(engine.DefaultThresholds()),
 		FootballDataOrg: FootballDataOrgConfig{DaysAhead: 14},
+		Admin:           AdminConfig{SessionHours: 12},
 	}
 }
 
@@ -223,6 +242,7 @@ func Load(path string) (*Config, error) {
 //	TD_TRUSTED_PROXIES    comma-separated IPs or CIDR ranges
 //	TD_LOG_LEVEL, TD_LOG_FORMAT
 //	TD_FOOTBALL_DATA_ORG_TOKEN  fixtures API key (secret)
+//	TD_ADMIN_SESSION_SECRET     signs admin sessions (secret)
 func (c *Config) ApplyEnvironment(lookup func(string) (string, bool)) error {
 	str := func(key string, dst *string) {
 		if v, ok := lookup(key); ok && v != "" {
@@ -242,6 +262,7 @@ func (c *Config) ApplyEnvironment(lookup func(string) (string, bool)) error {
 	str("TD_LOG_LEVEL", &c.Logging.Level)
 	str("TD_LOG_FORMAT", &c.Logging.Format)
 	str("TD_FOOTBALL_DATA_ORG_TOKEN", &c.FootballDataOrg.Token)
+	str("TD_ADMIN_SESSION_SECRET", &c.Admin.SessionSecret)
 	list("TD_ALLOWED_ORIGINS", &c.Server.AllowedOrigins)
 	list("TD_TRUSTED_PROXIES", &c.Server.TrustedProxies)
 
@@ -290,6 +311,12 @@ func (c *Config) Validate() error {
 	}
 	if d := c.FootballDataOrg.DaysAhead; d < 1 || d > 31 {
 		problems = append(problems, fmt.Sprintf("football_data_org days_ahead must be 1-31, got %d", d))
+	}
+	if s := c.Admin.SessionSecret; s != "" && len(s) < MinSessionSecret {
+		problems = append(problems, fmt.Sprintf("admin session_secret must be at least %d characters", MinSessionSecret))
+	}
+	if h := c.Admin.SessionHours; h < 1 || h > 24*7 {
+		problems = append(problems, fmt.Sprintf("admin session_hours must be 1-168, got %d", h))
 	}
 	if err := c.Rules.Thresholds().Validate(); err != nil {
 		problems = append(problems, "rules: "+strings.ReplaceAll(err.Error(), "\n", "; "))

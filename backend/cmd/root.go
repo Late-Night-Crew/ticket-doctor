@@ -5,6 +5,7 @@
 //	ticketdoctor import    load results and rebuild team profiles (the daily
 //	                       job, run from GitHub Actions rather than inside the
 //	                       server; SRS 2.3)
+//	ticketdoctor admin     create and manage admin accounts (B6)
 package cmd
 
 import (

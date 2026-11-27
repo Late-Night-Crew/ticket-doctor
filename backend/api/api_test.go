@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/gofiber/fiber/v3"
 
 	"ticketdoctor/config"
 	"ticketdoctor/pkg/problemdetail"
@@ -21,7 +24,8 @@ func newTestAPI(t *testing.T) *API {
 
 func do(t *testing.T, a *API, req *http.Request) *http.Response {
 	t.Helper()
-	res, err := a.App().Test(req)
+	// Sign-in hashes with bcrypt, which takes over Fiber's default 1 s under -race on CI.
+	res, err := a.App().Test(req, fiber.TestConfig{Timeout: 10 * time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}

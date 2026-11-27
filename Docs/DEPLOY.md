@@ -102,6 +102,24 @@ pg_dump "$EXTERNAL_DATABASE_URL" --data-only --table=analysed_legs --table=sugge
 
 `matches` and `teams` are included because the legs point to them. Keep the file private. It holds no personal data (NFR-8), but it's the app's track record.
 
+## Admin accounts (B6, from v0.5.0)
+
+**1. The session secret (once).** In Render, open `ticket-doctor-api`, go to Environment, add `TD_ADMIN_SESSION_SECRET`, and press **Generate** for the value. Save it, and the service restarts. Until this is set, `/admin` answers "Admin sign-in isn't set up".
+
+- The Blueprint declares the secret with `generateValue`. Auto-sync is off, though, so add it by hand rather than with a Manual Sync. A sync would also reset the API image to the one named in `render.yaml`.
+- Changing the secret signs every admin out.
+
+**2. Create an account** from your own machine. Use the released image, connecting with the database's **External** URL (Render → `ticket-doctor-db` → Connect). Read the URL into a variable so it stays out of your shell history:
+
+```sh
+read -rs TD_DATABASE_URL && export TD_DATABASE_URL   # paste the External URL, press Enter
+docker run -it --rm -e TD_DATABASE_URL ghcr.io/late-night-crew/ticket-doctor-api:v0.5.0 \
+  /app/ticketdoctor admin create joseph              # asks for the password twice
+unset TD_DATABASE_URL
+```
+
+`admin password`, `admin disable`, `admin enable` and `admin list` work the same way. Then sign in at `https://ticket-doctor.onrender.com/admin`.
+
 ## Day to day
 
 | Task | How |
@@ -111,4 +129,5 @@ pg_dump "$EXTERNAL_DATABASE_URL" --data-only --table=analysed_legs --table=sugge
 | Import now | Actions → Import → Run workflow |
 | Logs | Render → `ticket-doctor-api` → Logs (JSON, one line per request) |
 | Is it up? | `https://ticket-doctor.onrender.com/api/health` shows the running version |
+| Enter a missing result | `/admin` → Results (the next import replaces it if its file has the game) |
 | Free hours | All free web services in the workspace share 750 hours a month (sleeping ones use none). If they run out, Render suspends them until the 1st |

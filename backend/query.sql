@@ -237,3 +237,69 @@ SELECT finished_at FROM import_runs
 WHERE status = 'succeeded' AND finished_at IS NOT NULL
 ORDER BY finished_at DESC
 LIMIT 1;
+
+-- ---------- admin (B6) ----------
+
+-- name: CreateUser :one
+INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING *;
+
+-- name: GetUserByUsername :one
+SELECT * FROM users WHERE username = $1;
+
+-- name: GetUser :one
+SELECT * FROM users WHERE id = $1;
+
+-- name: ListUsers :many
+SELECT * FROM users ORDER BY username;
+
+-- name: SetUserPassword :execrows
+UPDATE users SET password_hash = $2, password_changed_at = now() WHERE username = $1;
+
+-- name: SetUserDisabled :execrows
+UPDATE users SET disabled = $2 WHERE username = $1;
+
+-- name: RecordLogin :exec
+UPDATE users SET last_login_at = now() WHERE id = $1;
+
+-- name: ListAdminMatches :many
+-- Matches for the result entry page. Awaiting: kicked off but no result yet.
+-- Recent: finished in the last two weeks, newest first, to correct a score.
+SELECT m.id, m.league_id, m.kickoff, m.status, m.home_goals, m.away_goals, m.source,
+       h.name AS home_name, a.name AS away_name
+FROM matches m
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE (sqlc.narg(league_id)::text IS NULL OR m.league_id = sqlc.narg(league_id)::text)
+  AND CASE WHEN sqlc.arg(awaiting)::boolean
+           THEN m.status IN ('scheduled', 'postponed') AND m.kickoff < sqlc.arg(now)::timestamptz
+           ELSE m.status = 'finished' AND m.kickoff >= sqlc.arg(now)::timestamptz - interval '14 days'
+      END
+ORDER BY CASE WHEN sqlc.arg(awaiting)::boolean THEN m.kickoff END ASC,
+         m.kickoff DESC, m.id
+LIMIT 300;
+
+-- name: GetMatchForUpdate :one
+SELECT id, league_id, kickoff, status, home_goals, away_goals FROM matches WHERE id = $1 FOR UPDATE;
+
+-- name: SetManualResult :exec
+UPDATE matches
+SET status = 'finished', home_goals = $2, away_goals = $3, source = 'manual', updated_at = now()
+WHERE id = $1;
+
+-- name: InsertResultEntry :exec
+INSERT INTO result_entries (match_id, user_id, home_goals, away_goals, previous_home, previous_away)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: DashboardCounts :one
+SELECT
+  (SELECT count(*) FROM matches WHERE status = 'scheduled' AND kickoff >= sqlc.arg(now)::timestamptz) AS upcoming,
+  (SELECT count(*) FROM matches WHERE status IN ('scheduled', 'postponed') AND kickoff < sqlc.arg(now)::timestamptz) AS awaiting_result,
+  (SELECT count(*) FROM matches WHERE status = 'finished') AS finished,
+  (SELECT count(DISTINCT ticket_id) FROM analysed_legs) AS tickets,
+  (SELECT count(DISTINCT ticket_id) FROM analysed_legs WHERE created_at >= sqlc.arg(now)::timestamptz - interval '7 days') AS tickets_7d,
+  (SELECT count(*) FROM analysed_legs WHERE on_ticket) AS legs,
+  (SELECT count(*) FROM suggestions s JOIN analysed_legs l ON l.id = s.analysed_leg_id WHERE l.on_ticket) AS suggestions,
+  (SELECT count(*) FROM suggestions s JOIN analysed_legs l ON l.id = s.analysed_leg_id WHERE l.on_ticket AND s.accepted) AS accepted;
+
+-- name: ListImportRuns :many
+SELECT * FROM import_runs ORDER BY started_at DESC LIMIT $1;

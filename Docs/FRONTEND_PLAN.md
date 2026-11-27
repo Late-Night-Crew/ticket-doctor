@@ -20,7 +20,7 @@ The SRS builds the UI in milestone M3, after the data and analyser core. We are 
 | F4 | Ticket wizard (beginner and guided paths) | FR-8, RG-6 | Done |
 | F5 | Results page | FR-7.3, RG-3 | Done |
 | F6 | Performance and accessibility pass, deploy setup | NFR-2, NFR-3 | Done (hosting moved to Render in B5) |
-| F7 | Admin: manual result entry, threshold view | FR-1.4 (Should) | Waiting on open question 6 (admin access) |
+| F7 | Admin: sign-in, dashboard, manual result entry, threshold view | FR-1.4 (Should) | Backend ready (B6); pages next |
 
 ## API contract
 
@@ -167,10 +167,10 @@ Items 1, 2, 11 and 12 were confirmed on 2026-11-26; items 3, 4 and 10 were decid
 3. ~~**Double chance 12**~~ **Decided 2026-11-27: not in the MVP**, possibly later as a low-pay option. See SRS addendum C.
 4. ~~**"This weekend"**~~ **Decided 2026-11-27: Central Africa Time**, decided by the server. See SRS addendum A5.
 5. ~~Wizard ticket sizes~~: replaced by agreed addition 11 (exact number of games).
-6. **Admin access** is not specified. A shared secret on the API is suggested for the MVP.
-7. **Analysis runs on an explicit "Analyse" tap**, not on every edit, to stay within the free-tier limits.
-8. **Help links in the footer** are UK-based (BeGambleAware, GamCare, Gamblers Anonymous). Add Malawi-specific resources if there are any.
-9. **When for beginners.** FR-8.3 says the beginner path asks only risk and focus, so the wizard uses this weekend. Should it use today when today has enough matches?
+6. ~~**Admin access**~~ **Decided 2026-11-27:** admin accounts and a sign-in page with its own app shell at `/admin`. See BACKEND_PLAN B6 and D5.
+7. ~~**Analysis runs on an explicit "Analyse" tap**~~ **Decided 2026-11-27: keep the explicit tap**, not analysis on every edit. It keeps requests within free-tier limits, and each logged analysis is one the user meant.
+8. ~~**Help links in the footer**~~ **Decided 2026-11-27:** keep the UK links (BeGambleAware, GamCare, Gamblers Anonymous) and add a Malawi line pointing to the Malawi Gaming and Lotteries Authority.
+9. ~~**When for beginners**~~ **Decided 2026-11-27:** the beginner path uses today's games when there are enough, and falls back to this weekend.
 10. ~~**Fair swap comparison (backend).**~~ **Decided 2026-11-27: yes**, together with counting each match once per ticket. See SRS addendum A6. FR-7.3 compares all original picks with all suggestions, but swaps exist only for Medium and High legs, which flatters the swaps. Suggest `/api/results` also returns, per row, the hit rate of the *original picks that received a suggestion*, so the page can compare like with like.
 11. **Number of games in the wizard (amends FR-8.2 and FR-8.3).** Agreed 2026-11-26: the user picks an exact number of games, 2–10 on the guided path and 2–4 on the beginner path. Risk level and number of games are separate choices. If fewer games qualify, the ticket is shorter and says why (4.6.6).
 12. **Risk level picks the band, not just the limit (amends 4.6 rules 3 and 5).** As written, 4.6 takes the highest-estimate pick per match and fills by estimate, so Bold tickets came out the same as Safe whenever enough Low legs existed. Agreed 2026-11-26 (from the request for "high risk, high reward with only 2 games"):

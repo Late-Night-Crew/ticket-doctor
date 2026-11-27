@@ -48,6 +48,10 @@ services:
       # from any of them: the per-IP rate limit then sees the visitor's address.
       - key: TD_TRUSTED_PROXIES
         value: 0.0.0.0/0,::/0
+      # Signs admin sessions (B6). Render makes a random value once; changing
+      # it signs every admin out. Without it, admin sign-in is off.
+      - key: TD_ADMIN_SESSION_SECRET
+        generateValue: true
 
   - type: web
     name: ticket-doctor

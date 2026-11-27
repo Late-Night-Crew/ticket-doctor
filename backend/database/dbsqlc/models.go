@@ -59,6 +59,17 @@ type Match struct {
 	UpdatedAt  time.Time
 }
 
+type ResultEntry struct {
+	ID           int64
+	MatchID      int64
+	UserID       int64
+	HomeGoals    int16
+	AwayGoals    int16
+	PreviousHome *int16
+	PreviousAway *int16
+	CreatedAt    time.Time
+}
+
 type Suggestion struct {
 	ID            int64
 	AnalysedLegID int64
@@ -96,4 +107,15 @@ type TeamProfile struct {
 	Over25Rate     float64
 	Under35Rate    float64
 	UpdatedAt      time.Time
+}
+
+type User struct {
+	ID                int64
+	Username          string
+	PasswordHash      string
+	Role              string
+	PasswordChangedAt time.Time
+	Disabled          bool
+	LastLoginAt       *time.Time
+	CreatedAt         time.Time
 }
