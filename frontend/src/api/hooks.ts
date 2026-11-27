@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, post } from './client'
 import type {
   AcceptSuggestionResponse,
@@ -8,6 +8,7 @@ import type {
   FixtureWindow,
   League,
   ResultsResponse,
+  SavedTicket,
   WizardRequest,
   WizardResponse,
 } from './types'
@@ -73,5 +74,49 @@ export function useResults(filters: { league?: string; market?: string } = {}) {
     queryKey: ['results', filters],
     queryFn: () => api<ResultsResponse>(`/results?${qs}`),
     staleTime: HOUR,
+  })
+}
+
+/* ---------- Saved tickets (V2) ---------- */
+
+export function useSaveTicket() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ticketId: string) => post<SavedTicket>('/saved', { ticket_id: ticketId }),
+    onSuccess: (t) => {
+      qc.setQueryData(['saved', t.id], t)
+      qc.invalidateQueries({ queryKey: ['saved-list'] })
+    },
+  })
+}
+
+export function useSavedTicket(id: string | undefined) {
+  return useQuery({
+    queryKey: ['saved', id],
+    queryFn: () => api<SavedTicket>(`/saved/${encodeURIComponent(id!)}`),
+    enabled: !!id,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useSavedList(ids: string[]) {
+  return useQuery({
+    queryKey: ['saved-list', ids],
+    queryFn: () => api<SavedTicket[]>(`/saved?ids=${ids.map(encodeURIComponent).join(',')}`),
+    enabled: ids.length > 0,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useDeleteSaved() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ticketId }: { id: string; ticketId: string }) =>
+      api<void>(`/saved/${encodeURIComponent(id)}`, { method: 'DELETE', body: JSON.stringify({ ticket_id: ticketId }) }),
+    onSuccess: (_, { id }) => {
+      qc.removeQueries({ queryKey: ['saved', id] })
+      qc.invalidateQueries({ queryKey: ['saved-list'] })
+    },
   })
 }

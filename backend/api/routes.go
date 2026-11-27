@@ -10,6 +10,7 @@ import (
 	"ticketdoctor/api/admin"
 	"ticketdoctor/api/leagues"
 	"ticketdoctor/api/results"
+	"ticketdoctor/api/saved"
 	"ticketdoctor/api/tickets"
 	"ticketdoctor/api/wizard"
 	"ticketdoctor/logging/loggedmodule"
@@ -42,6 +43,7 @@ func (a *API) routes() {
 	tickets.New(services.NewTicketService(d.Pool, d.Engine, d.Now)).Register(api)
 	wizard.New(services.NewWizardService(d.Pool, d.Engine, d.Now)).Register(api)
 	results.New(services.NewResultsService(d.Pool)).Register(api)
+	saved.New(services.NewSavedService(d.Pool, d.Now)).Register(api)
 
 	if secret := a.sessionSecret(); secret != nil {
 		auth := services.NewAuthService(d.Pool, secret, time.Duration(a.cfg.Admin.SessionHours)*time.Hour, d.Now).

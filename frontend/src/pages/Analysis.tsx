@@ -6,6 +6,7 @@ import type { AnalyseRequest, AnalysedLeg, Suggestion } from '../api/types'
 import { SwapOption } from '../components/analysis/SwapOption'
 import { TicketSummary } from '../components/analysis/TicketSummary'
 import { PageSpinner } from '../components/AppLayout'
+import { SaveTicketCard } from '../components/saved/SaveTicketCard'
 import { Disclaimer } from '../components/Disclaimer'
 import { IconSwap } from '../components/Icons'
 import { LegCard } from '../components/LegCard'
@@ -112,6 +113,7 @@ export default function Analysis() {
                   {c.updating}
                 </p>
               )}
+              <SaveTicketCard ticketId={ticket.ticketId} updating={updating} changed={JSON.stringify(request)} />
             </div>
           </div>
 

@@ -4,7 +4,7 @@ import { COPY } from '../config/copy'
 import { useTicket } from '../state/useTicket'
 import { ErrorBoundary } from './ErrorBoundary'
 import { Footer } from './Footer'
-import { IconChart, IconHome, IconLogo, IconTicket, IconWand } from './Icons'
+import { IconBookmark, IconChart, IconHome, IconLogo, IconTicket, IconWand } from './Icons'
 import { RouteEffects } from './RouteEffects'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -13,6 +13,7 @@ const NAV = [
   { to: '/ticket', label: COPY.nav.build, icon: IconTicket, end: false },
   { to: '/wizard', label: COPY.nav.wizard, icon: IconWand, end: false },
   { to: '/results', label: COPY.nav.results, icon: IconChart, end: false },
+  { to: '/tickets', label: COPY.nav.saved, icon: IconBookmark, end: false },
 ]
 
 export function AppLayout() {

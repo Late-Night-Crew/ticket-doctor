@@ -29,6 +29,7 @@ The server needs the database. To run the frontend against it instead of the moc
 | `POST /api/wizard` | Builds a ticket from the rules |
 | `GET /api/results?league=&market=` | Track record, including the like-for-like group |
 | `POST /api/admin/login`, `POST /api/admin/logout`, `GET /api/admin/me` | Admin sign-in, using an HttpOnly session cookie |
+| `POST /api/saved`, `GET /api/saved/:id`, `GET /api/saved?ids=`, `DELETE /api/saved/:id` | V2 saved tickets: save a snapshot, open it by its link, list a browser's tickets, delete (needs the ticket's own id) |
 | `GET /api/admin/dashboard` | Match, ticket and suggestion counts, plus the last 10 import runs |
 | `GET /api/admin/matches?view=awaiting\|recent&league=` | Games kicked off with no result yet, or finished in the last two weeks |
 | `PUT /api/admin/matches/:id/result` | Enter or correct a final score (FR-1.4) |

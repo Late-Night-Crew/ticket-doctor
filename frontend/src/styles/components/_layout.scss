@@ -60,7 +60,7 @@
   z-index: $zindex-fixed;
   height: var(--td-nav-height);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--td-surface);
   border-top: 1px solid var(--td-line);
   padding-bottom: env(safe-area-inset-bottom);

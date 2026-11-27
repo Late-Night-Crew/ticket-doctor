@@ -165,3 +165,73 @@
     }
   }
 }
+
+// ---------- Saved tickets (V2) ----------
+
+// Won, lost and not-yet-played share one size and weight (RG-3).
+.td-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+
+  &--won {
+    color: var(--td-risk-low);
+    background: var(--td-risk-low-bg);
+  }
+  &--lost {
+    color: var(--td-risk-high);
+    background: var(--td-risk-high-bg);
+  }
+  &--pending {
+    color: var(--td-muted);
+    background: var(--td-surface-2);
+  }
+}
+
+.td-saved-outcomes {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem 1rem;
+  align-items: center;
+
+  dt {
+    font-weight: 600;
+  }
+  dd {
+    margin: 0;
+    .td-outcome {
+      margin-top: 0;
+    }
+  }
+}
+
+.td-pairs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--td-line);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+// Your pick | our suggestions | on your ticket; stacked on phones.
+.td-review__grid {
+  display: grid;
+  gap: 1rem;
+
+  @include media-breakpoint-up(sm) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.td-saved-row:hover {
+  border-color: var(--td-brand);
+}
