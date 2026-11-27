@@ -39,9 +39,17 @@ type WizardLeg struct {
 }
 
 type WizardResponse struct {
-	Legs            []WizardLeg `json:"legs"`
-	ShortfallReason *string     `json:"shortfall_reason"`
+	Legs []WizardLeg `json:"legs"`
+	// When is the window the ticket was built from: today or weekend. It
+	// differs from the request only for "soonest".
+	When            Window  `json:"when"`
+	ShortfallReason *string `json:"shortfall_reason"`
 }
+
+// Soonest builds from today's games if they can fill the ticket, otherwise
+// from this weekend's (the beginner path, which doesn't ask when; open
+// question 9, decided 2026-11-27).
+const Soonest Window = "soonest"
 
 // WizardService builds tickets from the rules (FR-8, section 4.6).
 type WizardService struct {
@@ -72,8 +80,8 @@ func (s *WizardService) Build(ctx context.Context, req WizardRequest) (*WizardRe
 		return nil, Invalid("focus must be wins, goals or mix.")
 	}
 	when := Window(req.When)
-	if when != Today && when != Weekend {
-		return nil, Invalid("when must be today or weekend.")
+	if when != Today && when != Weekend && when != Soonest {
+		return nil, Invalid("when must be today, weekend or soonest.")
 	}
 	// Out-of-range numbers are clamped, as the frontend's mock does (addendum A3).
 	target := int(math.Round(req.Legs))
@@ -82,6 +90,22 @@ func (s *WizardService) Build(ctx context.Context, req WizardRequest) (*WizardRe
 	}
 	target = min(target, maxLegs)
 
+	if when != Soonest {
+		return s.build(ctx, when, risk, focus, target, req.Seed)
+	}
+	res, err := s.build(ctx, Today, risk, focus, target, req.Seed)
+	if err != nil || len(res.Legs) >= target {
+		return res, err
+	}
+	weekend, err := s.build(ctx, Weekend, risk, focus, target, req.Seed)
+	if err != nil || len(weekend.Legs) <= len(res.Legs) {
+		return res, err
+	}
+	return weekend, nil
+}
+
+// build makes a ticket from one window's fixtures.
+func (s *WizardService) build(ctx context.Context, when Window, risk engine.Risk, focus engine.Focus, target int, seed int64) (*WizardResponse, error) {
 	from, to := WindowRange(when, s.now())
 	rows, err := s.q.ListFixtures(ctx, dbsqlc.ListFixturesParams{KickoffFrom: from, KickoffTo: to})
 	if err != nil {
@@ -103,10 +127,10 @@ func (s *WizardService) Build(ctx context.Context, req WizardRequest) (*WizardRe
 		matches = append(matches, s.engine.Candidates(f.ID, profiles[2*i], profiles[2*i+1], focus))
 	}
 
-	if req.Seed > 0 {
+	if seed > 0 {
 		// Regenerate (FR-8.9): leave out a random third of the games, so a
 		// different ticket appears, unless that leaves too few.
-		rnd := rand.New(rand.NewPCG(uint64(req.Seed), 0x7d))
+		rnd := rand.New(rand.NewPCG(uint64(seed), 0x7d))
 		kept := make([]engine.MatchCandidates, 0, len(matches))
 		for _, m := range matches {
 			if rnd.Float64() > 0.33 {
@@ -119,7 +143,7 @@ func (s *WizardService) Build(ctx context.Context, req WizardRequest) (*WizardRe
 	}
 
 	picked := s.engine.BuildTicket(matches, risk, target)
-	res := &WizardResponse{Legs: make([]WizardLeg, 0, len(picked))}
+	res := &WizardResponse{Legs: make([]WizardLeg, 0, len(picked)), When: when}
 	for _, p := range picked {
 		res.Legs = append(res.Legs, WizardLeg{
 			Fixture:    fixtures[p.MatchID],

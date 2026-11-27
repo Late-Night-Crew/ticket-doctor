@@ -28,7 +28,11 @@ export function WizardResult({ request, onRegenerate, onChangeAnswers }: Props) 
     (request.path === 'beginner' ? w.risk.beginnerOptions : w.risk.options)[request.risk].label,
     w.focus.options[request.focus].label,
     w.games.label(request.legs),
-    w.when.options[request.when].label,
+    // The beginner path asks for the soonest games; the answer says which window it used.
+    (() => {
+      const when = result.data?.when ?? (request.when === 'soonest' ? null : request.when)
+      return when ? w.when.options[when].label : w.when.soonestLabel
+    })(),
   ]
 
   function openInAnalyser() {

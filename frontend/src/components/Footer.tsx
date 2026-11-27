@@ -20,6 +20,13 @@ export function Footer() {
                 </span>
               ))}
             </p>
+            <p className="mb-0">
+              {COPY.footer.localHelp.before}
+              <a href={COPY.footer.localHelp.href} target="_blank" rel="noopener noreferrer">
+                {COPY.footer.localHelp.label}
+              </a>
+              {COPY.footer.localHelp.after}
+            </p>
           </div>
         </div>
         <p className="mb-0 small">{COPY.footer.noStake}</p>

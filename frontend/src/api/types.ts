@@ -122,7 +122,8 @@ export interface WizardRequest {
   focus: WizardFocus
   /** Exact number of games wanted: 2–10, or 2–4 on the beginner path. */
   legs: number
-  when: Exclude<FixtureWindow, 'upcoming'>
+  /** "soonest" (beginner path): today if its games can fill the ticket, otherwise this weekend. */
+  when: Exclude<FixtureWindow, 'upcoming'> | 'soonest'
   /** Changes on Regenerate (FR-8.9). */
   seed: number
 }
@@ -142,6 +143,8 @@ export interface WizardLeg {
 
 export interface WizardResponse {
   legs: WizardLeg[]
+  /** The window the ticket was built from (differs from the request only for "soonest"). */
+  when: Exclude<FixtureWindow, 'upcoming'>
   /** Set when fewer legs than asked qualified (rule 4.6.6). */
   shortfall_reason: string | null
 }

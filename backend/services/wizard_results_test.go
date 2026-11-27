@@ -52,6 +52,17 @@ func TestWizardBuildsFromTheWindow(t *testing.T) {
 		t.Fatalf("beginner clamp: %+v %v", res, err)
 	}
 
+	// "soonest" (the beginner path) uses today when today can fill the ticket.
+	res, err = s.Build(ctx, WizardRequest{Path: "beginner", Risk: "safe", Focus: "goals", Legs: 2, When: "soonest"})
+	if err != nil || res.When != Today || len(res.Legs) != 2 {
+		t.Fatalf("soonest with enough today: %+v %v", res, err)
+	}
+	// Today can't fill 3 and the weekend has fewer still, so it keeps today and says so.
+	res, err = s.Build(ctx, WizardRequest{Path: "beginner", Risk: "safe", Focus: "goals", Legs: 3, When: "soonest"})
+	if err != nil || res.When != Today || len(res.Legs) != 2 || res.ShortfallReason == nil || !strings.Contains(*res.ShortfallReason, "today") {
+		t.Fatalf("soonest, both short: %+v %v", res, err)
+	}
+
 	for name, req := range map[string]WizardRequest{
 		"bad path":  {Path: "expert", Risk: "safe", Focus: "mix", Legs: 2, When: "today"},
 		"bad risk":  {Path: "guided", Risk: "yolo", Focus: "mix", Legs: 2, When: "today"},
@@ -195,5 +206,28 @@ func TestFixturesByWindow(t *testing.T) {
 	leagues, err := s.Leagues(ctx)
 	if err != nil || len(leagues) != 3 {
 		t.Fatalf("leagues = %v %v", leagues, err)
+	}
+}
+
+func TestWizardSoonestFallsBackToTheWeekend(t *testing.T) {
+	w := newWorld(t, dbtest.New(t))
+	// One game left today (Friday), three on Saturday.
+	w.match(t, "Arsenal", "Chelsea", testNow.Add(3*time.Hour))
+	w.match(t, "Everton", "Leeds", testNow.Add(27*time.Hour))
+	w.match(t, "Chelsea", "Everton", testNow.Add(28*time.Hour))
+	w.match(t, "Leeds", "Arsenal", testNow.Add(29*time.Hour))
+	s := NewWizardService(w.pool, engine.Default(), clock)
+
+	res, err := s.Build(context.Background(), WizardRequest{Path: "beginner", Risk: "safe", Focus: "goals", Legs: 3, When: "soonest"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.When != Weekend || len(res.Legs) != 3 || res.ShortfallReason != nil {
+		t.Fatalf("soonest = %s with %d legs (%v), want the weekend's 3", res.When, len(res.Legs), res.ShortfallReason)
+	}
+	for _, l := range res.Legs {
+		if l.Fixture.Home.Name == "Arsenal" {
+			t.Fatalf("today's game on a weekend ticket: %+v", l.Fixture)
+		}
 	}
 }
