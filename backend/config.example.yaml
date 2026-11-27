@@ -42,3 +42,17 @@ database:
 logging:
   level: info            # debug | info | warn | error
   format: text           # text (readable) | json (log collectors)
+
+# Rule thresholds (SRS section 4, NFR-6). These are the SRS defaults; leave this
+# section out to use them. Changing a value changes every estimate, risk band and
+# suggestion, so change one at a time and note why. Invalid combinations stop the
+# server from starting.
+rules:
+  form_window: 10            # recent home/away matches per profile (FR-2.1)
+  low_confidence_below: 5    # fewer matches = "limited data", one band riskier (FR-2.3)
+  low_from: 0.65             # Low risk from 65% (4.2)
+  medium_from: 0.45          # Medium risk from 45%; below is High
+  swap_min_gain: 0.10        # a swap must be 10 points better (4.3)
+  max_suggestions: 2         # swaps offered per leg
+  value_margin: 0.05         # "value" when the estimate beats implied odds by 5 points (4.5)
+  bold_floor: 0.35           # the wizard never picks below 35% (4.6)

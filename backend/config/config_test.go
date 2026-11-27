@@ -109,6 +109,24 @@ func TestDatabaseURLWinsAndPasswordFromEnv(t *testing.T) {
 	}
 }
 
+func TestRulesDefaultToSRSAndCanBeTuned(t *testing.T) {
+	cfg, err := Load(writeFile(t, "rules:\n  low_from: 0.7\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	th := cfg.Rules.Thresholds()
+	if th.LowFrom != 0.7 || th.MediumFrom != 0.45 || th.FormWindow != 10 || th.BoldFloor != 0.35 {
+		t.Fatalf("thresholds = %+v; want low_from overridden and the rest at SRS defaults", th)
+	}
+}
+
+func TestInvalidRulesRejected(t *testing.T) {
+	_, err := Load(writeFile(t, "rules:\n  medium_from: 0.8\n"))
+	if err == nil || !strings.Contains(err.Error(), "rules:") {
+		t.Fatalf("expected a rules error, got %v", err)
+	}
+}
+
 func TestNoDatabaseConfigured(t *testing.T) {
 	if got := Defaults().Database.ConnString(); got != "" {
 		t.Fatalf("defaults should have no database, got %q", got)

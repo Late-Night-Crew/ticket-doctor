@@ -93,10 +93,14 @@ Each milestone ends with green CI and a pull request.
 - Done when `ticketdoctor server` answers `/api/health` and CI is green.
 - Also added: `docker-compose.yml` (local Postgres on port 55432), graceful shutdown on SIGTERM, request logging with request IDs, and CORS from config. Config works on environment variables alone, with no file needed on Render. The frontend now reads problem-detail `detail` messages, and the mock API returns the same format.
 
-**B1 Rules engine (SRS M2), no database needed**
+**B1 Rules engine (SRS M2): done 2026-11-26**
 - Port `scorer.ts` to `engine/`: profile maths, estimates (4.1 + A1), bands (4.2), swaps (4.3 + A2), combined and value (4.5), wizard (4.6 + A4), and **settle(market, goals) → won/lost**.
 - Thresholds come from config (NFR-6).
 - Done when the Go tests reproduce every case in `scorer.test.ts`, including the 4.4 worked example (NFR-7). Done first because it is pure, test-led, and the frontend tests already give the expected numbers.
+- **Result:** `backend/engine`, with 100% test coverage.
+  - **Parity:** `engine/testdata/parity.json` is generated from the TypeScript scorer: 36 team pairings, 540 estimates with their reason sentences, 604 swaps and 36 wizard tickets. The Go tests must match it exactly, and the frontend test `src/mocks/parity.test.ts` checks the scorer still produces it, so changing a rule in one language only fails CI. Mutation-checked: a one-word reason change or a 0.11 swap gain fails it.
+  - **Settle:** settles all 15 markets (needed for B4). A test checks that `Contradicts` is exactly "no score from 0-0 to 9-9 lets both win", which proves addendum A2 has no gaps.
+  - **Also included:** profile building from results with the window and form string (FR-2), and a `rules:` section in config (NFR-6) that is validated at startup.
 
 **B2 Data (SRS M1)**
 - Migrations 01–07, `query.sql` + sqlc.
