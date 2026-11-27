@@ -93,6 +93,9 @@ func (e *Engine) Estimate(m Market, home, away Profile) (MarketEstimate, error) 
 		return MarketEstimate{}, fmt.Errorf("unknown market %q", m)
 	}
 
+	// Never claim near-certainty: the reason still gives the real record.
+	est = min(est, e.t.MaxEstimate)
+
 	sample := min(hn, an)
 	low := sample < e.t.LowConfidenceBelow
 	band := e.BandFor(est)

@@ -135,6 +135,9 @@ export function estimateMarket(key: MarketKey, home: TeamProfile, away: TeamProf
       break
   }
 
+  // Never claim near-certainty: the reason still gives the real record.
+  estimate = Math.min(estimate, RULES.maxEstimate)
+
   const sample = Math.min(hn, an)
   const lowConfidence = sample < RULES.lowConfidenceBelow
   let band = bandFor(estimate)

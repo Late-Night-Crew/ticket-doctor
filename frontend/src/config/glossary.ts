@@ -17,7 +17,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { id: 'implied', term: 'Implied probability', body: '1 ÷ decimal odds. Odds of 2.00 imply a 50% chance. Bookmakers add a margin, so implied chances are usually a little high.' },
   { id: 'fair-odds', term: 'Fair odds', body: "1 ÷ the app's estimated chance. A 50% estimate gives fair odds of 2.00. This is our estimate only; bookmaker odds will differ." },
   { id: 'combined', term: 'Combined chance', body: 'The chance that every leg wins, found by multiplying the chances of each leg. It falls quickly as you add legs.' },
-  { id: 'risk-band', term: 'Risk band', body: 'Low: estimated chance of 65% or more. Medium: 45% to under 65%. High: under 45%. Limited data moves a leg up one band.' },
+  { id: 'risk-band', term: 'Risk band', body: 'Low: estimated chance of 65% or more. Medium: 45% to under 65%. High: under 45%. Limited data moves a leg up one band. We never estimate above 95%: even a perfect recent record is not a certainty.' },
   { id: 'form-window', term: 'Form window', body: "How many recent home or away matches a team's stats use. The default is the last 10." },
 ]
 
