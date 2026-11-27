@@ -2,9 +2,9 @@
 //
 //	ticketdoctor server    start the HTTP API
 //	ticketdoctor migrate   apply the embedded database migrations
-//
-// Added in later milestones: seed (demo data) and import (daily data job, run
-// from GitHub Actions rather than inside the server; SRS 2.3).
+//	ticketdoctor import    load results and rebuild team profiles (the daily
+//	                       job, run from GitHub Actions rather than inside the
+//	                       server; SRS 2.3)
 package cmd
 
 import (

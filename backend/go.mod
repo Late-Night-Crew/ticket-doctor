@@ -8,6 +8,7 @@ require (
 	github.com/pressly/goose/v3 v3.30.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
+	golang.org/x/text v0.44.0
 )
 
 require (
@@ -42,5 +43,4 @@ require (
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
-	golang.org/x/text v0.44.0 // indirect
 )
