@@ -34,6 +34,18 @@ type Config struct {
 	Logging     LoggingConfig  `mapstructure:"logging"`
 	// Rules holds the rule thresholds (NFR-6). Defaults are the SRS values.
 	Rules RulesConfig `mapstructure:"rules"`
+	// FootballDataOrg is the upcoming-fixtures source (decision D4).
+	FootballDataOrg FootballDataOrgConfig `mapstructure:"football_data_org"`
+}
+
+// FootballDataOrgConfig configures the fixtures import from football-data.org.
+type FootballDataOrgConfig struct {
+	// Token is the API key. Keep it out of committed files: put it in the
+	// untracked config.yaml locally, and TD_FOOTBALL_DATA_ORG_TOKEN elsewhere.
+	Token string `mapstructure:"token"`
+	// DaysAhead is how far ahead to import fixtures. 14 covers today, this
+	// weekend and next weekend.
+	DaysAhead int `mapstructure:"days_ahead"`
 }
 
 // RulesConfig mirrors engine.Thresholds with config file names. Change these
@@ -157,9 +169,10 @@ func Defaults() *Config {
 			Port:           8080,
 			AllowedOrigins: []string{"http://localhost:5173"},
 		},
-		Database: DatabaseConfig{Port: 5432, Sslmode: "disable", MaxConns: 5},
-		Logging:  LoggingConfig{Level: "info", Format: "text"},
-		Rules:    rulesFrom(engine.DefaultThresholds()),
+		Database:        DatabaseConfig{Port: 5432, Sslmode: "disable", MaxConns: 5},
+		Logging:         LoggingConfig{Level: "info", Format: "text"},
+		Rules:           rulesFrom(engine.DefaultThresholds()),
+		FootballDataOrg: FootballDataOrgConfig{DaysAhead: 14},
 	}
 }
 
@@ -206,6 +219,7 @@ func Load(path string) (*Config, error) {
 //	TD_ALLOWED_ORIGINS    comma-separated frontend origins
 //	TD_TRUSTED_PROXIES    comma-separated IPs or CIDR ranges
 //	TD_LOG_LEVEL, TD_LOG_FORMAT
+//	TD_FOOTBALL_DATA_ORG_TOKEN  fixtures API key (secret)
 func (c *Config) ApplyEnvironment(lookup func(string) (string, bool)) error {
 	str := func(key string, dst *string) {
 		if v, ok := lookup(key); ok && v != "" {
@@ -224,6 +238,7 @@ func (c *Config) ApplyEnvironment(lookup func(string) (string, bool)) error {
 	str("TD_HOST", &c.Server.Host)
 	str("TD_LOG_LEVEL", &c.Logging.Level)
 	str("TD_LOG_FORMAT", &c.Logging.Format)
+	str("TD_FOOTBALL_DATA_ORG_TOKEN", &c.FootballDataOrg.Token)
 	list("TD_ALLOWED_ORIGINS", &c.Server.AllowedOrigins)
 	list("TD_TRUSTED_PROXIES", &c.Server.TrustedProxies)
 
@@ -269,6 +284,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Database.MaxConns < 1 {
 		problems = append(problems, "database max_conns must be at least 1")
+	}
+	if d := c.FootballDataOrg.DaysAhead; d < 1 || d > 31 {
+		problems = append(problems, fmt.Sprintf("football_data_org days_ahead must be 1-31, got %d", d))
 	}
 	if err := c.Rules.Thresholds().Validate(); err != nil {
 		problems = append(problems, "rules: "+strings.ReplaceAll(err.Error(), "\n", "; "))

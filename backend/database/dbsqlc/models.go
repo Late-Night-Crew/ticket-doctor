@@ -24,6 +24,7 @@ type League struct {
 	Source    string
 	FdCode    *string
 	CreatedAt time.Time
+	FdoCode   *string
 }
 
 type Match struct {
