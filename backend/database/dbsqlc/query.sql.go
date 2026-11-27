@@ -78,6 +78,116 @@ func (q *Queries) CountMatchesByLeague(ctx context.Context) ([]CountMatchesByLea
 	return items, nil
 }
 
+const countSettledLegs = `-- name: CountSettledLegs :many
+
+SELECT m.league_id, l.original_market, m.home_goals, m.away_goals,
+       EXISTS (SELECT 1 FROM suggestions s WHERE s.analysed_leg_id = l.id) AS had_suggestion,
+       count(*) AS legs
+FROM analysed_legs l
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+  AND ($1::text IS NULL OR m.league_id = $1::text)
+  AND ($2::text IS NULL OR l.original_market = $2::text)
+GROUP BY 1, 2, 3, 4, 5
+`
+
+type CountSettledLegsParams struct {
+	LeagueID *string
+	Market   *string
+}
+
+type CountSettledLegsRow struct {
+	LeagueID       string
+	OriginalMarket string
+	HomeGoals      *int16
+	AwayGoals      *int16
+	HadSuggestion  bool
+	Legs           int64
+}
+
+// ---------- results (B3) ----------
+// Legs still on their ticket whose match has finished, counted per league,
+// user's pick, final score and whether we suggested a swap. Scores repeat a
+// lot, so this stays a few hundred rows however many tickets there are; the
+// engine settles each group once (B4).
+func (q *Queries) CountSettledLegs(ctx context.Context, arg CountSettledLegsParams) ([]CountSettledLegsRow, error) {
+	rows, err := q.db.Query(ctx, countSettledLegs, arg.LeagueID, arg.Market)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountSettledLegsRow{}
+	for rows.Next() {
+		var i CountSettledLegsRow
+		if err := rows.Scan(
+			&i.LeagueID,
+			&i.OriginalMarket,
+			&i.HomeGoals,
+			&i.AwayGoals,
+			&i.HadSuggestion,
+			&i.Legs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countSettledSuggestions = `-- name: CountSettledSuggestions :many
+SELECT m.league_id, s.market, m.home_goals, m.away_goals, count(*) AS suggestions
+FROM suggestions s
+JOIN analysed_legs l ON l.id = s.analysed_leg_id
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+  AND ($1::text IS NULL OR m.league_id = $1::text)
+  AND ($2::text IS NULL OR s.market = $2::text)
+GROUP BY 1, 2, 3, 4
+`
+
+type CountSettledSuggestionsParams struct {
+	LeagueID *string
+	Market   *string
+}
+
+type CountSettledSuggestionsRow struct {
+	LeagueID    string
+	Market      string
+	HomeGoals   *int16
+	AwayGoals   *int16
+	Suggestions int64
+}
+
+// Suggestions on finished matches, counted per league, market and final score.
+func (q *Queries) CountSettledSuggestions(ctx context.Context, arg CountSettledSuggestionsParams) ([]CountSettledSuggestionsRow, error) {
+	rows, err := q.db.Query(ctx, countSettledSuggestions, arg.LeagueID, arg.Market)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountSettledSuggestionsRow{}
+	for rows.Next() {
+		var i CountSettledSuggestionsRow
+		if err := rows.Scan(
+			&i.LeagueID,
+			&i.Market,
+			&i.HomeGoals,
+			&i.AwayGoals,
+			&i.Suggestions,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteLegSuggestions = `-- name: DeleteLegSuggestions :exec
 DELETE FROM suggestions WHERE analysed_leg_id = $1
 `
@@ -541,93 +651,6 @@ func (q *Queries) ListProfilesForTeams(ctx context.Context, arg ListProfilesForT
 			&i.Over25Rate,
 			&i.Under35Rate,
 			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listSettledLegs = `-- name: ListSettledLegs :many
-
-SELECT l.id, m.league_id, l.original_market, m.home_goals, m.away_goals,
-       EXISTS (SELECT 1 FROM suggestions s WHERE s.analysed_leg_id = l.id) AS had_suggestion
-FROM analysed_legs l
-JOIN matches m ON m.id = l.match_id
-WHERE l.on_ticket AND m.status = 'finished'
-`
-
-type ListSettledLegsRow struct {
-	ID             int64
-	LeagueID       string
-	OriginalMarket string
-	HomeGoals      *int16
-	AwayGoals      *int16
-	HadSuggestion  bool
-}
-
-// ---------- results (B3) ----------
-// Legs still on their ticket whose match has finished, with the score.
-func (q *Queries) ListSettledLegs(ctx context.Context) ([]ListSettledLegsRow, error) {
-	rows, err := q.db.Query(ctx, listSettledLegs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListSettledLegsRow{}
-	for rows.Next() {
-		var i ListSettledLegsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.LeagueID,
-			&i.OriginalMarket,
-			&i.HomeGoals,
-			&i.AwayGoals,
-			&i.HadSuggestion,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listSettledSuggestions = `-- name: ListSettledSuggestions :many
-SELECT s.market, m.league_id, m.home_goals, m.away_goals
-FROM suggestions s
-JOIN analysed_legs l ON l.id = s.analysed_leg_id
-JOIN matches m ON m.id = l.match_id
-WHERE l.on_ticket AND m.status = 'finished'
-`
-
-type ListSettledSuggestionsRow struct {
-	Market    string
-	LeagueID  string
-	HomeGoals *int16
-	AwayGoals *int16
-}
-
-func (q *Queries) ListSettledSuggestions(ctx context.Context) ([]ListSettledSuggestionsRow, error) {
-	rows, err := q.db.Query(ctx, listSettledSuggestions)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListSettledSuggestionsRow{}
-	for rows.Next() {
-		var i ListSettledSuggestionsRow
-		if err := rows.Scan(
-			&i.Market,
-			&i.LeagueID,
-			&i.HomeGoals,
-			&i.AwayGoals,
 		); err != nil {
 			return nil, err
 		}

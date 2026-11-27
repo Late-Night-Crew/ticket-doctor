@@ -145,11 +145,20 @@ Each milestone ends with green CI and a pull request.
     - A 15-leg analysis took about 30 ms, or 0.6 s on the first request while the database connection opens.
   - **For B5:** analysis makes about 2 queries per leg. On Supabase the cost is network round trips, so keep the API and database in the same region.
 
-**B4 Settlement and track record (SRS M5)**
+**B4 Settlement and track record (SRS M5): done 2026-11-27**
 - ~~The import settles finished matches~~: B3 settles when results are read, so nothing is stored and a corrected score fixes itself.
 - ~~Results aggregation and the like-for-like figure~~: done in B3.
-- Left: check it against a real matchday, and decide whether to store outcomes later for speed (only if `/api/results` gets slow).
 - Done when, after a matchday is imported, `/api/results` counts change correctly and pending legs stay pending.
+- **Result:**
+  - **End-to-end test** (`services/settlement_test.go`): fixtures import → ticket analysed → results import records the score → track record counts it.
+    - The result lands on the fixture's own row, not a duplicate, even though the two sources give different kick-off times.
+    - A game not yet played stays pending.
+    - A corrected score (2-1 to 1-1) turns the leg from won to lost on the next import.
+  - **Real matchdays:** on a copy of the local database, legs were logged in all 15 markets for every game played since 1 November (67 games, 9 match days, 1,005 legs). The track record matched an independent SQL settlement in all 45 league × market cells.
+  - **Speed:**
+    - **Before:** at 200,000 legs and 267,000 suggestions, sending every row to Go took 2.2–3.6 s.
+    - **After:** the database now counts legs per league, market and final score, and the engine settles each group once, so the rules still live only in Go. That takes 0.54 s for everything, 0.25 s for one league and 0.07 s for one league and market. At realistic volumes it's a few milliseconds.
+    - **If it ever gets slow:** most of the remaining time is checking whether each leg got a suggestion. Storing that as a column on `analysed_legs`, set during analysis, would remove it.
 
 **Release process (added 2026-11-26).** Tag-based releases are in place: `v0.1.0` exists, and `release.yml` checks the tagged commit, builds `ghcr.io/late-night-crew/ticket-doctor-api:<tag>` and creates the GitHub Release. See [RELEASING.md](../RELEASING.md). Every migration from B2 on must follow its backward-compatibility rule.
 
