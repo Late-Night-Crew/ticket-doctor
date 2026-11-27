@@ -172,3 +172,68 @@ export interface ResultsResponse {
   updated_at: string | null
   rows: ResultsRow[]
 }
+
+/* ---------- Saved tickets (V2, FR-9) ---------- */
+
+export type PickOutcome = 'won' | 'lost' | 'pending'
+
+export interface SavedPick {
+  market: MarketKey
+  odds?: number | null
+  estimate?: number
+  risk_band?: RiskBand
+  outcome: PickOutcome
+}
+
+export interface SavedSuggestion {
+  market: MarketKey
+  estimate: number
+  risk_band: RiskBand
+  accepted: boolean
+  outcome: PickOutcome
+}
+
+export interface SavedLeg {
+  fixture: Fixture
+  match_status: 'scheduled' | 'postponed' | 'finished'
+  score: { home: number; away: number } | null
+  /** The user's own pick. */
+  original: SavedPick
+  /** The pick on the ticket in the end (differs when a swap was accepted). */
+  final: SavedPick
+  /** Every suggestion shown for this leg, accepted or not (FR-9.3). */
+  suggestions: SavedSuggestion[]
+}
+
+/** For each suggestion shown, how it did against the user's own pick (FR-9.6). */
+export interface PairCounts {
+  suggestion_won_pick_lost: number
+  pick_won_suggestion_lost: number
+  both_won: number
+  both_lost: number
+}
+
+export interface SavedSummary {
+  legs: number
+  settled: number
+  original: HitCount
+  final: HitCount
+  pairs: PairCounts
+  original_ticket: PickOutcome
+  final_ticket: PickOutcome
+}
+
+export interface SavedTicket {
+  /** The private link id: /t/<id>. */
+  id: string
+  origin: TicketOrigin
+  created_at: string
+  updated_at: string
+  status: 'pending' | 'settled'
+  settled_at: string | null
+  /** When it will be deleted (90 days after settling); null until settled. */
+  expires_at: string | null
+  summary: SavedSummary
+  /** Only on a single ticket, not in lists. */
+  legs?: SavedLeg[]
+}

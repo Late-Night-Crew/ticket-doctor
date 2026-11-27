@@ -9,6 +9,7 @@ import type {
 } from '../api/types'
 import { RULES } from '../config/rules'
 import { adminHandlers } from './admin'
+import { recordAnalysis, savedHandlers } from './saved'
 import { fixtureById, fixturesIn, LEAGUES, profilesFor, seeded } from './data'
 import {
   buildWizardTicket,
@@ -35,6 +36,7 @@ let legSeq = 0
 
 export const handlers = [
   ...adminHandlers,
+  ...savedHandlers,
   http.get(`${API}/leagues`, async () => {
     await delay(LATENCY)
     return HttpResponse.json(LEAGUES)
@@ -106,6 +108,7 @@ export const handlers = [
       },
       weakest_leg_id: weakest.id,
     }
+    recordAnalysis(res)
     return HttpResponse.json(res)
   }),
 

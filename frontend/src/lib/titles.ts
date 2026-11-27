@@ -11,6 +11,8 @@ const TITLES: [prefix: string, title: string][] = [
   ['/ticket', COPY.nav.build],
   ['/wizard', COPY.wizard.entryTitle],
   ['/results', COPY.nav.results],
+  ['/tickets', COPY.nav.saved],
+  ['/t', COPY.saved.eyebrow],
   ['/glossary', COPY.nav.glossary],
   ['/dev/styleguide', 'Styleguide'],
 ]

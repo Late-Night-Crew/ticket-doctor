@@ -9,6 +9,8 @@ const Analysis = lazy(() => import('./pages/Analysis'))
 const Wizard = lazy(() => import('./pages/Wizard'))
 const Results = lazy(() => import('./pages/Results'))
 const Glossary = lazy(() => import('./pages/Glossary'))
+const SavedTicket = lazy(() => import('./pages/SavedTicket'))
+const MyTickets = lazy(() => import('./pages/MyTickets'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 // The admin area (B6) is its own app shell and its own chunks: public visitors never download it.
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
@@ -39,6 +41,8 @@ export default function App() {
         <Route path="wizard/*" element={<Wizard />} />
         <Route path="results" element={<Results />} />
         <Route path="glossary" element={<Glossary />} />
+        <Route path="t/:id" element={<SavedTicket />} />
+        <Route path="tickets" element={<MyTickets />} />
         {Styleguide && <Route path="dev/styleguide" element={<Styleguide />} />}
         <Route path="*" element={<NotFound />} />
       </Route>

@@ -121,11 +121,19 @@ Let a user save a ticket and, once every game has been played, compare side by s
 
 Suggestions shown for each leg already live in `suggestions` (with `accepted` and `outcome`) through `analysed_legs`. A saved leg links to its last `analysed_legs` row.
 
-### B5. Open questions
+### B5. Decisions (2026-11-27)
 
-1. How long are saved tickets kept: until settled plus N days, or indefinitely?
-2. Should a private link be view-only for anyone who has it, or does reopening a ticket need the original browser too?
-3. With no accounts, there are no "your ticket has settled" notifications; the user has to come back. Is that acceptable for V2?
+1. **Keeping:** saved tickets are kept for **90 days after their last game settles**, then deleted by the daily import. A ticket that never settles (a game cancelled for good) is deleted 180 days after saving.
+2. **Links:** **anyone with the link can view** a ticket. Only the browser that saved it can update or delete it: that needs the ticket's own id, which never appears in the link.
+3. **Notifications:** none. "My tickets" marks each ticket pending or settled.
+
+### B6. How it was built (V2, 2026-11-27)
+
+- **Saving** takes a snapshot of the ticket log: the user's pick, every suggestion shown (accepted or not) and the final pick. Later edits don't change it; saving again replaces the snapshot and keeps the link.
+- **The link** is `/t/<id>`, where the id is 128 random bits.
+- **Results** are worked out from the scores when the ticket is read, with the same settlement as the track record. The review shows each leg's three columns, the pair counts (FR-9.6) and the ticket as first picked and as finally chosen.
+- **"My tickets"** is the list of saved ids in this browser's localStorage. Ids the server no longer has are forgotten.
+- **Deleting** a saved ticket leaves the ticket log, and so the public track record, unchanged.
 
 ---
 
