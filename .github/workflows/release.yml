@@ -2,7 +2,7 @@
 # existing tag (re-release / rollback). See RELEASING.md.
 #
 #   prepare ──► frontend checks ──┐
-#           └─► backend checks ───┴─► image ──► github-release ──► (deploy, from B5)
+#           └─► backend checks ───┴─► image ──► github-release ──► deploy (Render)
 #
 # Each arrow is "needs:": a job starts only when the jobs it needs succeeded.
 
@@ -209,9 +209,78 @@ jobs:
             echo "Created release $TAG."
           fi
 
-  # 5. Deploy (added in B5, see Docs/BACKEND_PLAN.md):
-  #    - deploy-api:      tell Render to run $IMAGE:<tag> (Render API, secret RENDER_API_KEY)
-  #    - deploy-frontend: build with VITE_API_URL and publish to Vercel production
-  #                       (Vercel CLI, secret VERCEL_TOKEN; Git auto-deploys to
-  #                       production switched off, so only releases reach it)
-  #    Both "needs: github-release", so nothing deploys unless everything above passed.
+  # 5. Deploy the release to Render (render.yaml, Docs/DEPLOY.md): the API runs
+  #    exactly the image built above, the frontend is built from exactly the
+  #    tagged commit. Running this workflow by hand for an older tag deploys that
+  #    tag: that's the rollback.
+  #
+  #    Needs (Settings → Secrets and variables → Actions):
+  #      secret   RENDER_API_KEY           Render → Account settings → API keys
+  #      variable RENDER_API_SERVICE_ID    ticket-doctor-api's id (srv-...)
+  #      variable RENDER_SITE_SERVICE_ID   ticket-doctor's id (srv-...)
+  #      variable SITE_URL                 e.g. https://ticket-doctor.onrender.com
+  #    Until they exist the job says so and skips, so releases still work.
+  deploy:
+    name: Deploy to Render
+    needs: [prepare, github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Shows each deploy under Deployments → production on the repository page.
+    environment: production
+    steps:
+      - name: Deploy and wait
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          API_SERVICE: ${{ vars.RENDER_API_SERVICE_ID }}
+          SITE_SERVICE: ${{ vars.RENDER_SITE_SERVICE_ID }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ] || [ -z "$API_SERVICE" ] || [ -z "$SITE_SERVICE" ] || [ -z "$SITE_URL" ]; then
+            echo "::notice::Render isn't set up yet (see Docs/DEPLOY.md), so $TAG was released but not deployed."
+            exit 0
+          fi
+          render() { # method path [json body]
+            curl -fsS -X "$1" "https://api.render.com/v1$2" \
+              -H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" \
+              ${3:+-H "Content-Type: application/json" -d "$3"}
+          }
+          # Start a deploy and wait until Render says it's live.
+          deploy() { # service body label
+            id="$(render POST "/services/$1/deploys" "$2" | jq -r .id)"
+            echo "$3: deploy $id started"
+            for i in $(seq 1 100); do
+              status="$(render GET "/services/$1/deploys/$id" | jq -r .status)"
+              case "$status" in
+                live) echo "$3: live"; return 0 ;;
+                *failed|canceled|deactivated) echo "::error::$3 deploy $id ended as $status"; return 1 ;;
+              esac
+              sleep 15
+            done
+            echo "::error::$3 deploy $id still $status after 25 minutes"; return 1
+          }
+          # API first (it migrates the database on start), then the frontend.
+          deploy "$API_SERVICE" "{\"imageUrl\": \"$IMAGE:$TAG\"}" "API"
+          deploy "$SITE_SERVICE" "{\"commitId\": \"$SHA\"}" "Frontend"
+
+      - name: Check the live site
+        if: vars.SITE_URL != ''
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          # Through the static site's /api rewrite, so this checks the whole path.
+          # The free API may take a minute to wake up.
+          for i in $(seq 1 12); do
+            version="$(curl -fsS --max-time 60 "$SITE_URL/api/health" | jq -r .version || true)"
+            if [ "$version" = "$TAG" ]; then
+              echo "$SITE_URL is serving $TAG"
+              echo "Live: $SITE_URL ($TAG)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            echo "Health says '$version', waiting for $TAG"
+            sleep 10
+          done
+          echo "::error::$SITE_URL/api/health never reported $TAG"
+          exit 1

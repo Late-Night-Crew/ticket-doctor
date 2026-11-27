@@ -1,0 +1,65 @@
+# Daily data import: results and odds (football-data.co.uk), upcoming fixtures
+# (football-data.org), team profiles. It runs here rather than on Render because
+# the free API sleeps when idle and Render's cron jobs aren't free.
+#
+# It runs the latest released image, so it always matches what's deployed, and
+# never unreleased code from main. See Docs/DEPLOY.md.
+#
+# Needs (Settings → Secrets and variables → Actions → Secrets):
+#   TD_DATABASE_URL             the database's *External* connection string (Render → ticket-doctor-db → Connect)
+#   TD_FOOTBALL_DATA_ORG_TOKEN  the football-data.org API key
+
+name: Import
+
+on:
+  schedule:
+    # 04:15 UTC (06:15 in Malawi), and 22:15 UTC to pick up the evening's results
+    # and late fixture changes. GitHub may start scheduled runs a little late.
+    - cron: '15 4 * * *'
+    - cron: '15 22 * * *'
+  # "Run workflow" button: import now, e.g. right after setting up the database.
+  workflow_dispatch:
+
+# Never two imports at once; a new one waits for the running one.
+concurrency:
+  group: import
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    name: Import results and fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Find the released image
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAS_DB: ${{ secrets.TD_DATABASE_URL != '' }}
+        run: |
+          if [ "$HAS_DB" != "true" ]; then
+            echo "::notice::TD_DATABASE_URL isn't set yet (see Docs/DEPLOY.md); nothing to import into."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The latest full release (pre-releases like v1.0.0-rc.1 are skipped).
+          tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          echo "Using release $tag"
+          echo "image=ghcr.io/late-night-crew/ticket-doctor-api:$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Migrate and import
+        if: steps.release.outputs.skip != 'true'
+        env:
+          IMAGE: ${{ steps.release.outputs.image }}
+          TD_DATABASE_URL: ${{ secrets.TD_DATABASE_URL }}
+          TD_FOOTBALL_DATA_ORG_TOKEN: ${{ secrets.TD_FOOTBALL_DATA_ORG_TOKEN }}
+        run: |
+          run() {
+            docker run --rm -e TD_DATABASE_URL -e TD_FOOTBALL_DATA_ORG_TOKEN "$IMAGE" /app/ticketdoctor "$@"
+          }
+          # The API migrates on start too; this covers an import that runs first.
+          run migrate
+          run import

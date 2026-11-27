@@ -32,7 +32,7 @@ While the MVP is pre-launch we stay below 1.0:
    2. runs the frontend and backend CI checks again on exactly that commit;
    3. builds the API image `ghcr.io/late-night-crew/ticket-doctor-api:v0.2.0`, with the version baked in (`/api/health` reports it);
    4. creates the GitHub Release, with notes generated from the merged pull requests;
-   5. *(from B5)* deploys that image to Render and the frontend to Vercel.
+   5. deploys it to Render: the API runs that exact image, the frontend is built from that exact commit, and the job waits until the live site's `/api/health` reports the new version. Until Render is set up ([Docs/DEPLOY.md](Docs/DEPLOY.md)) this step says so and skips.
 
    If any step fails, nothing after it runs, so nothing half-released goes out. Fix the problem in a pull request, merge it, and tag the **next** version.
 
@@ -40,8 +40,8 @@ While the MVP is pre-launch we stay below 1.0:
 
 The previous version's image still exists, unchanged. To go back to it:
 
-- **Actions → Release → Run workflow**, enter the previous tag (e.g. `v0.1.0`), and run. It redeploys that exact version. (Until B5 there's nothing deployed, so this only rebuilds the release.)
-- In an emergency, Render and Vercel both have a one-click "Rollback" in their dashboards. Afterwards, check that `main` gets the fix and a new tag.
+- **Actions → Release → Run workflow**, enter the previous tag (e.g. `v0.3.0`), and run. It redeploys that exact version: the API image and the frontend commit.
+- In an emergency, Render has a one-click "Rollback" on each service's Events page. Afterwards, check that `main` gets the fix and a new tag.
 
 Then fix forward: correct the problem on `main` and release a new patch version.
 
@@ -62,3 +62,5 @@ Then fix forward: correct the problem on `main` and release a new patch version.
 | Releases and notes | GitHub → Releases |
 | API images | GitHub → the organisation's Packages → `ticket-doctor-api` |
 | Image build | [backend/Dockerfile](backend/Dockerfile), [backend/deploy/start.sh](backend/deploy/start.sh) (migrate, then serve) |
+| Hosting | [render.yaml](render.yaml), set up once with [Docs/DEPLOY.md](Docs/DEPLOY.md) |
+| Daily data import | [.github/workflows/import.yml](.github/workflows/import.yml) (runs the latest release's image) |

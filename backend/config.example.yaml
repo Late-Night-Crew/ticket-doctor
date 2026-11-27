@@ -2,7 +2,7 @@
 # config.yaml is optional: every setting has a default, and environment variables
 # override the file. Put secrets in environment variables, not here:
 #   TD_DATABASE_PASSWORD  password for the database fields below
-#   TD_DATABASE_URL       full connection string (Supabase); overrides the fields
+#   TD_DATABASE_URL       full connection string (Render); overrides the fields
 #   TD_ENVIRONMENT      overrides "environment"
 #   PORT / TD_PORT      listen port (Render sets PORT)
 
@@ -30,10 +30,9 @@ database:
   sslmode: disable      # require for a remote database
   max_conns: 5
 
-  # Supabase (B5): set TD_DATABASE_URL instead of the fields above; it wins.
-  # Use the *session pooler* connection string (port 5432 on the pooler host).
-  # The direct host is IPv6-only on the free plan, and the transaction pooler
-  # (port 6543) does not support the prepared statements pgx uses.
+  # A hosted database (Render in production, see Docs/DEPLOY.md): set
+  # TD_DATABASE_URL instead of the fields above; it wins. To run the import
+  # from your machine against Render, use the database's *External* URL.
   # url: ""
 
   # No local Postgres? "task db:up" starts one in Docker on port 55432:

@@ -32,13 +32,17 @@ src/
 
 `mocks/scorer.test.ts` encodes the SRS worked example (4.4). The Go rule tests should assert the same values.
 
-## Deploy (Vercel)
+## Deploy (Render)
 
-1. Import the repository in Vercel and set the **root directory** to `frontend`. `vercel.json` sets the build, the client-side routing fallback, asset caching and security headers.
-2. Set environment variables in the Vercel project:
-   - `VITE_API_URL`: the Go API's base URL, e.g. `https://ticket-doctor-api.onrender.com`. The Go API must allow CORS from the Vercel domain.
-   - `VITE_USE_MOCKS`: `false` in Production. Set it to `true` in Preview to demo the app on mock data before the API exists.
-3. Render's free tier sleeps when idle, so the first API call after a quiet spell can take 30 s or more.
+The frontend is a Render static site defined in [`../render.yaml`](../render.yaml), which sets:
+- the build (`npm ci && npm run build` in `frontend/`, Node 22);
+- the client-side routing fallback;
+- asset caching;
+- the security headers, including the Content-Security-Policy.
+
+It forwards `/api/*` to the Go API, so the app calls its own address and `VITE_API_URL` stays empty. Only releases deploy it (the Release workflow deploys the tagged commit). The one-time setup is in [`../Docs/DEPLOY.md`](../Docs/DEPLOY.md).
+
+The free API sleeps when idle, so the first call after a quiet spell can take up to a minute.
 
 Variables prefixed `VITE_` are compiled into the public bundle. Never put secrets in them; API keys belong only in the Go API (NFR-4).
 

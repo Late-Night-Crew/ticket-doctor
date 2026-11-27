@@ -5,14 +5,14 @@
 # rollback to the previous release still works (see RELEASING.md).
 #
 # Configuration comes from environment variables only (no config.yaml):
-#   TD_DATABASE_URL      Supabase session-pooler connection string (required)
+#   TD_DATABASE_URL      Postgres connection string (required; Render sets it, see render.yaml)
 #   TD_ALLOWED_ORIGINS   frontend origins, comma-separated (required)
-#   TD_TRUSTED_PROXIES   the host's proxy range, e.g. 10.0.0.0/8 on Render
+#   TD_TRUSTED_PROXIES   proxies allowed to set X-Forwarded-For (render.yaml trusts Render's)
 #   PORT                 set by the host
 set -eu
 
 echo "==> Migrating the database"
-# The database may still be waking up (Supabase free tier): retry for a minute.
+# The database may not be accepting connections yet (e.g. just created): retry for a minute.
 tries=0
 until /app/ticketdoctor migrate; do
   tries=$((tries + 1))
