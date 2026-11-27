@@ -18,11 +18,11 @@ type HitCount struct {
 	Lost int `json:"lost"`
 }
 
-func (h *HitCount) add(o engine.Outcome) {
+func (h *HitCount) add(o engine.Outcome, n int) {
 	if o == engine.Won {
-		h.Won++
+		h.Won += n
 	} else {
-		h.Lost++
+		h.Lost += n
 	}
 }
 
@@ -46,7 +46,9 @@ type ResultsResponse struct {
 
 // ResultsService builds the public track record (FR-7.2, FR-7.3). Outcomes
 // are worked out from the final score when read, so a newly imported matchday
-// shows up straight away and unplayed matches are never counted.
+// shows up straight away, a corrected score corrects the record, and unplayed
+// matches are never counted. The database counts legs per league, market and
+// score; the engine settles each group once, so the rules live only in Go.
 type ResultsService struct {
 	q *dbsqlc.Queries
 }
@@ -72,7 +74,12 @@ func (s *ResultsService) Results(ctx context.Context, league, market string) (*R
 	if _, ok := leagueOrder[league]; league != "" && !ok {
 		return nil, NotFound(fmt.Sprintf("No league called %q.", league))
 	}
-	keep := func(l, m string) bool { return (league == "" || l == league) && (market == "" || m == market) }
+	filter := func(v string) *string {
+		if v == "" {
+			return nil
+		}
+		return &v
+	}
 
 	type key struct{ league, market string }
 	rows := map[key]*ResultsRow{}
@@ -84,37 +91,31 @@ func (s *ResultsService) Results(ctx context.Context, league, market string) (*R
 		return rows[k]
 	}
 
-	legs, err := s.q.ListSettledLegs(ctx)
+	legs, err := s.q.CountSettledLegs(ctx, dbsqlc.CountSettledLegsParams{LeagueID: filter(league), Market: filter(market)})
 	if err != nil {
 		return nil, err
 	}
 	for _, l := range legs {
-		if !keep(l.LeagueID, l.OriginalMarket) {
-			continue
-		}
 		o, err := settle(l.OriginalMarket, l.HomeGoals, l.AwayGoals)
 		if err != nil {
 			return nil, err
 		}
 		r := row(l.LeagueID, l.OriginalMarket)
-		r.Original.add(o)
+		r.Original.add(o, int(l.Legs))
 		if l.HadSuggestion {
-			r.OriginalWithSuggestion.add(o)
+			r.OriginalWithSuggestion.add(o, int(l.Legs))
 		}
 	}
-	suggestions, err := s.q.ListSettledSuggestions(ctx)
+	suggestions, err := s.q.CountSettledSuggestions(ctx, dbsqlc.CountSettledSuggestionsParams{LeagueID: filter(league), Market: filter(market)})
 	if err != nil {
 		return nil, err
 	}
 	for _, sg := range suggestions {
-		if !keep(sg.LeagueID, sg.Market) {
-			continue
-		}
 		o, err := settle(sg.Market, sg.HomeGoals, sg.AwayGoals)
 		if err != nil {
 			return nil, err
 		}
-		row(sg.LeagueID, sg.Market).Suggested.add(o)
+		row(sg.LeagueID, sg.Market).Suggested.add(o, int(sg.Suggestions))
 	}
 
 	res := &ResultsResponse{Rows: make([]ResultsRow, 0, len(rows))}

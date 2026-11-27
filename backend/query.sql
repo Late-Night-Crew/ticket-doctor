@@ -206,20 +206,31 @@ UPDATE suggestions SET accepted = true WHERE id = $1;
 
 -- ---------- results (B3) ----------
 
--- name: ListSettledLegs :many
--- Legs still on their ticket whose match has finished, with the score.
-SELECT l.id, m.league_id, l.original_market, m.home_goals, m.away_goals,
-       EXISTS (SELECT 1 FROM suggestions s WHERE s.analysed_leg_id = l.id) AS had_suggestion
+-- name: CountSettledLegs :many
+-- Legs still on their ticket whose match has finished, counted per league,
+-- user's pick, final score and whether we suggested a swap. Scores repeat a
+-- lot, so this stays a few hundred rows however many tickets there are; the
+-- engine settles each group once (B4).
+SELECT m.league_id, l.original_market, m.home_goals, m.away_goals,
+       EXISTS (SELECT 1 FROM suggestions s WHERE s.analysed_leg_id = l.id) AS had_suggestion,
+       count(*) AS legs
 FROM analysed_legs l
 JOIN matches m ON m.id = l.match_id
-WHERE l.on_ticket AND m.status = 'finished';
+WHERE l.on_ticket AND m.status = 'finished'
+  AND (sqlc.narg(league_id)::text IS NULL OR m.league_id = sqlc.narg(league_id)::text)
+  AND (sqlc.narg(market)::text IS NULL OR l.original_market = sqlc.narg(market)::text)
+GROUP BY 1, 2, 3, 4, 5;
 
--- name: ListSettledSuggestions :many
-SELECT s.market, m.league_id, m.home_goals, m.away_goals
+-- name: CountSettledSuggestions :many
+-- Suggestions on finished matches, counted per league, market and final score.
+SELECT m.league_id, s.market, m.home_goals, m.away_goals, count(*) AS suggestions
 FROM suggestions s
 JOIN analysed_legs l ON l.id = s.analysed_leg_id
 JOIN matches m ON m.id = l.match_id
-WHERE l.on_ticket AND m.status = 'finished';
+WHERE l.on_ticket AND m.status = 'finished'
+  AND (sqlc.narg(league_id)::text IS NULL OR m.league_id = sqlc.narg(league_id)::text)
+  AND (sqlc.narg(market)::text IS NULL OR s.market = sqlc.narg(market)::text)
+GROUP BY 1, 2, 3, 4;
 
 -- name: LastSuccessfulImport :one
 SELECT finished_at FROM import_runs
