@@ -120,20 +120,27 @@ export const handlers = [
     const max = body.path === 'beginner' ? RULES.wizard.beginnerMaxLegs : RULES.wizard.maxLegs
     const target = Math.min(max, Math.max(RULES.wizard.minLegs, Math.round(Number(body.legs) || 0)))
 
-    let matches = fixturesIn(body.when).map((f) => {
-      const { home, away } = profilesFor(f)
-      return wizardCandidates(f.id, home, away, body.focus)
-    })
-
-    if (body.seed > 0) {
-      // Regenerate: drop a random third of matches so a different ticket appears.
-      const rnd = seeded(body.seed)
-      const kept = matches.filter(() => rnd() > 0.33)
-      if (kept.length >= target) matches = kept
+    const build = (when: 'today' | 'weekend') => {
+      let matches = fixturesIn(when).map((f) => {
+        const { home, away } = profilesFor(f)
+        return wizardCandidates(f.id, home, away, body.focus)
+      })
+      if (body.seed > 0) {
+        // Regenerate: drop a random third of matches so a different ticket appears.
+        const rnd = seeded(body.seed)
+        const kept = matches.filter(() => rnd() > 0.33)
+        if (kept.length >= target) matches = kept
+      }
+      return buildWizardTicket(matches, body.risk, target)
     }
-
-    const picked = buildWizardTicket(matches, body.risk, target)
-    const day = body.when === 'today' ? 'today' : 'this weekend'
+    // "soonest": today if it fills the ticket, else the weekend if that gives more (as the Go API).
+    let when: 'today' | 'weekend' = body.when === 'soonest' ? 'today' : body.when
+    let picked = build(when)
+    if (body.when === 'soonest' && picked.length < target) {
+      const weekend = build('weekend')
+      if (weekend.length > picked.length) [when, picked] = ['weekend', weekend]
+    }
+    const day = when === 'today' ? 'today' : 'this weekend'
     const res: WizardResponse = {
       legs: picked.map((c) => ({
         fixture: fixtureById(c.matchId)!,
@@ -145,6 +152,7 @@ export const handlers = [
         window_n: RULES.formWindow,
         fair_odds: 1 / c.estimate,
       })),
+      when,
       shortfall_reason:
         picked.length < target
           ? `Only ${picked.length} of the ${target} games you asked for met the ${body.risk} rules for ${day}, so the ticket is shorter. We never loosen the rules to fill a ticket.`

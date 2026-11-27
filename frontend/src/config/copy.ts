@@ -39,6 +39,13 @@ export const COPY = {
       { label: 'Gamblers Anonymous', href: 'https://www.gamblersanonymous.org' },
       { label: 'GamCare', href: 'https://www.gamcare.org.uk' },
     ],
+    // Open question 8 (decided 2026-11-27): a local line beside the international links.
+    localHelp: {
+      before: 'In Malawi, the gambling regulator ',
+      label: 'MAGLA',
+      href: 'https://magla.org.mw',
+      after: ' can point you to local support.',
+    },
     noStake: 'Ticket Doctor does not take bets, handle money or link to bookmakers.',
   },
 
@@ -226,6 +233,8 @@ export const COPY = {
         today: { label: 'Today', body: 'Matches kicking off today.' },
         weekend: { label: 'This weekend', body: 'Saturday and Sunday matches.' },
       },
+      /** Shown for the beginner path until the ticket says which it used. */
+      soonestLabel: 'Today or this weekend',
     },
 
     result: {

@@ -1,3 +1,4 @@
+import { Footer } from './Footer'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Disclaimer } from './Disclaimer'
@@ -34,5 +35,16 @@ describe('GlossaryTerm', () => {
     render(<GlossaryTerm id="btts">BTTS</GlossaryTerm>)
     await userEvent.click(screen.getByRole('button', { name: 'BTTS' }))
     expect(await screen.findByText(/each team scores at least one goal/)).toBeInTheDocument()
+  })
+})
+
+describe('Footer (RG-4)', () => {
+  it('links international help and the Malawi regulator, opening in a new tab', () => {
+    render(<Footer />)
+    for (const name of ['BeGambleAware', 'Gamblers Anonymous', 'GamCare', 'MAGLA']) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute('rel', 'noopener noreferrer')
+    }
+    expect(screen.getByRole('link', { name: 'MAGLA' })).toHaveAttribute('href', 'https://magla.org.mw')
+    expect(screen.getByText(/In Malawi, the gambling regulator/)).toBeInTheDocument()
   })
 })

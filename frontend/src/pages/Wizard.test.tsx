@@ -66,7 +66,11 @@ describe('Ticket wizard (FR-8)', () => {
     expect(screen.getByRole('heading', { name: 'How this ticket works' })).toBeInTheDocument() // FR-8.7
     expect(screen.getAllByText(/Based on each team's last 10 matches/).length).toBeGreaterThan(0) // NFR-5
 
-    expect(requests.at(-1)).toMatchObject({ path: 'beginner', risk: 'safe', focus: 'mix', legs: 3 })
+    // Q9: beginners aren't asked when; the ticket says which window it used.
+    expect(requests.at(-1)).toMatchObject({ path: 'beginner', risk: 'safe', focus: 'mix', legs: 3, when: 'soonest' })
+    const answers = within(screen.getByRole('list', { name: 'Your answers' }))
+    expect(answers.queryByText('Today or this weekend')).not.toBeInTheDocument()
+    expect(answers.getByText(/^(Today|This weekend)$/)).toBeInTheDocument()
     expect(screen.getByText('Ticket fair odds')).toBeInTheDocument()
     const legs = screen.getAllByRole('article')
     expect(legs.length).toBeGreaterThan(0)

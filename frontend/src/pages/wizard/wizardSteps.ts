@@ -1,7 +1,7 @@
 import type { WizardFocus, WizardPath, WizardRisk } from '../../api/types'
 import { RULES } from '../../config/rules'
 
-export type When = 'today' | 'weekend'
+export type When = 'today' | 'weekend' | 'soonest'
 export type StepId = 'stake' | 'risk' | 'bold' | 'focus' | 'games' | 'when' | 'result'
 
 export interface Answers {
@@ -24,8 +24,11 @@ export function stepsFor(path: WizardPath, risk: WizardRisk | null): StepId[] {
   return ['risk', 'focus', 'games', 'when', 'result']
 }
 
-/** Beginners are not asked when; the weekend has the most matches to choose from. */
-export const BEGINNER_WHEN: When = 'weekend'
+/**
+ * Beginners are not asked when: they get today's games if there are enough,
+ * otherwise this weekend's (open question 9, decided 2026-11-27).
+ */
+export const BEGINNER_WHEN: When = 'soonest'
 
 export const initial = (path: WizardPath): Answers =>
   path === 'beginner'
