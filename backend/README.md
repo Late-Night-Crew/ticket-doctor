@@ -2,7 +2,7 @@
 
 Go API for Ticket Doctor. It has the same layout as the Late Night Crew School Management System backend (and parrot), so it should feel familiar. The plan is in [../Docs/BACKEND_PLAN.md](../Docs/BACKEND_PLAN.md).
 
-> Status: **B0, B1 and B2 done.** CLI (`server`, `migrate`, `import`), rules engine, database schema, results and fixtures import, and team profiles. The ticket endpoints (B3) are next (see the plan).
+> Status: **B0 to B3 done.** CLI (`server`, `migrate`, `import`), rules engine, results and fixtures import, team profiles, and every endpoint the frontend uses. Settlement and go-live (B4, B5) are next (see the plan).
 
 ## Run it
 
@@ -14,9 +14,22 @@ psql -U postgres -h localhost -c "CREATE DATABASE ticketdoctor"   # once
 cp config.example.yaml config.yaml                                  # once; fill in the password
 task migrate      # apply migrations
 task import       # results and upcoming fixtures for the 3 leagues, rebuild team profiles (~5 s)
-task dev          # API on http://127.0.0.1:8080, try /api/health
+task dev          # API on http://127.0.0.1:8080, try /api/leagues
 task check        # everything CI runs
 ```
+
+The server needs the database. To run the frontend against it instead of the mock API, start it with `VITE_USE_MOCKS=false VITE_API_URL=http://localhost:8080 npm run dev` (in `frontend/`). The API only answers browsers from `server.allowed_origins`, which defaults to `http://localhost:5173`.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /api/leagues` | The supported leagues |
+| `GET /api/leagues/:id/fixtures?when=today\|weekend\|upcoming` | Games not yet started; "today" and "weekend" in Central Africa Time |
+| `POST /api/tickets/analyse` | Rates 1–15 legs, suggests swaps, logs the ticket (one row per ticket and match) |
+| `POST /api/suggestions/:id/accept` | Records an accepted swap |
+| `POST /api/wizard` | Builds a ticket from the rules |
+| `GET /api/results?league=&market=` | Track record, including the like-for-like group |
+
+POST requests are limited to 30 a minute per IP. Errors are problem details whose `detail` the frontend shows as is.
 
 Fixtures need a free football-data.org API key in `football_data_org.token` (your `config.yaml`) or `TD_FOOTBALL_DATA_ORG_TOKEN`; without one, a development import loads results only.
 

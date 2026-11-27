@@ -16,7 +16,7 @@ func newTestAPI(t *testing.T) *API {
 	t.Helper()
 	cfg := config.Defaults()
 	cfg.Server.AllowedOrigins = []string{"https://ticketdoctor.app"}
-	return New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), "test-1.2.3")
+	return New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), "test-1.2.3", Deps{})
 }
 
 func do(t *testing.T, a *API, req *http.Request) *http.Response {

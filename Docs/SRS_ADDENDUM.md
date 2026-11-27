@@ -2,7 +2,7 @@
 
 Changes and additions to *Ticket Doctor — Software Requirements Specification (MVP)* (Nov 23, 2026). Where this addendum and the SRS disagree, this addendum wins.
 
-Last updated: 2026-11-26.
+Last updated: 2026-11-27.
 
 ---
 
@@ -50,6 +50,36 @@ As written, 4.6 takes the highest-estimate pick in each match and fills the tick
 - The SRS limits still hold: Balanced has at most half Medium; Bold keeps at least half Low or Medium, with a 35% floor.
 - If too few games qualify, the ticket is shorter and says why. The thresholds are never lowered (4.6.6).
 
+### A5. "Today" and "this weekend" are in Central Africa Time (amends FR-1.2 and FR-8.2)
+
+Agreed 2026-11-27. The server decides which fixtures fall in each window, in Central Africa Time (CAT, UTC+2, no daylight saving), so every user sees the same games whatever their device's clock or time zone.
+
+| Window | Fixtures |
+|---|---|
+| Today | Kick-off from now until midnight CAT |
+| This weekend | Kick-off from now until the end of the coming Sunday (CAT), on Saturday or Sunday. On a Saturday or Sunday, that means the rest of the current weekend |
+| Upcoming | Every fixture not yet started that has been imported (about two weeks ahead) |
+
+Only games that haven't kicked off can be picked or analysed. Postponed games are left out.
+
+### A6. How the track record counts picks (amends FR-7.1 and FR-7.3)
+
+Agreed 2026-11-27. With no accounts, every tap of **Analyse** sends the whole ticket again, so the log has to tell repeats and accepted swaps apart from new picks:
+
+| ID | Requirement |
+|---|---|
+| FR-7.1a | Each ticket has a random id made in the browser (no personal data, NFR-8). The log keeps **one row per ticket per match**, however often the ticket is analysed |
+| FR-7.1b | The **user's pick** for a match is the market they chose themselves. Accepting a suggestion changes the *final* pick but not the user's pick, so a suggestion is never counted as the user's own. Choosing a different market themselves replaces the user's pick and drops the suggestions made for the old one |
+| FR-7.1c | Each suggestion is logged once per ticket and match, with whether it was accepted |
+| FR-7.1d | A match removed from the ticket before the last analysis is not counted |
+| FR-7.3a | Next to "our suggestions", the results page shows how **the user's picks that received a suggestion** did. Suggestions are only made for Medium and High legs, so this is the like-for-like comparison; comparing with every user pick would flatter the suggestions |
+
+The row per ticket and match (the user's pick, the suggestions shown, the final pick) is also what V2's saved tickets need (FR-9.3).
+
+### A7. Estimates are capped at 95% (amends 4.1)
+
+Agreed 2026-11-27. After any formula in 4.1 (and A1), an estimate is limited to **95%** (`max_estimate`, NFR-6). A team that scored in all of its last 10 home games has a strong record, not a certain result, and showing 100% would read as a guarantee (RG-1). The reason sentence still gives the real record ("scored in 10 of last 10 home games"). The capped value is used everywhere: risk bands, swaps, combined chance, fair odds and the wizard.
+
 ---
 
 ## B. Version 2: saved tickets and pick comparison
@@ -96,3 +126,9 @@ Suggestions shown for each leg already live in `suggestions` (with `accepted` an
 1. How long are saved tickets kept: until settled plus N days, or indefinitely?
 2. Should a private link be view-only for anyone who has it, or does reopening a ticket need the original browser too?
 3. With no accounts, there are no "your ticket has settled" notifications; the user has to come back. Is that acceptable for V2?
+
+---
+
+## C. Deferred
+
+- **Double chance 12 (home or away wins).** Decided 2026-11-27 not to offer it in the MVP. Its estimate (1 − the draw estimate) is usually around 70–75%, so it would crowd Safe wizard tickets and swap suggestions with low-paying legs. It may come back later as a deliberate low-pay option, for example a ticket built only from 12 selections. Adding it then means a new market in the engine and the frontend, a settle rule (a draw loses), and a contradiction rule (it can never win together with a draw).

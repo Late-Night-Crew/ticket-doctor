@@ -2,6 +2,206 @@
  "generated_by": "frontend/src/mocks/parity.test.ts",
  "matches": [
   {
+   "match_id": "perfect-v-hopeless",
+   "home": {
+    "team": "Perfect",
+    "venue": "home",
+    "sample_size": 10,
+    "win_rate": 1,
+    "draw_rate": 0,
+    "loss_rate": 0,
+    "scored_rate": 1,
+    "clean_sheet_rate": 0.6,
+    "btts_rate": 0.4,
+    "over15_rate": 1,
+    "over25_rate": 0.8,
+    "under35_rate": 0.5
+   },
+   "away": {
+    "team": "Hopeless",
+    "venue": "away",
+    "sample_size": 10,
+    "win_rate": 0,
+    "draw_rate": 0,
+    "loss_rate": 1,
+    "scored_rate": 0.4,
+    "clean_sheet_rate": 0,
+    "btts_rate": 0.4,
+    "over15_rate": 1,
+    "over25_rate": 0.7,
+    "under35_rate": 0.5
+   },
+   "estimates": [
+    {
+     "market": "HOME_WIN",
+     "estimate": 0.95,
+     "risk_band": "low",
+     "reason": "Perfect won 10 of last 10 home games; Hopeless lost 10 of last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "DRAW",
+     "estimate": 0,
+     "risk_band": "high",
+     "reason": "Perfect drew 0 of last 10 at home; Hopeless drew 0 of last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "AWAY_WIN",
+     "estimate": 0,
+     "risk_band": "high",
+     "reason": "Hopeless won 0 of last 10 away games; Perfect lost 0 of last 10 at home.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "DC_1X",
+     "estimate": 0.95,
+     "risk_band": "low",
+     "reason": "Hopeless won only 0 of last 10 away; Perfect lost 0 of last 10 at home.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "DC_X2",
+     "estimate": 0,
+     "risk_band": "high",
+     "reason": "Perfect won 10 of last 10 at home; Hopeless lost 10 of last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "BTTS_YES",
+     "estimate": 0.4,
+     "risk_band": "high",
+     "reason": "Both teams scored in 4 of Perfect's last 10 home games and 4 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "BTTS_NO",
+     "estimate": 0.6,
+     "risk_band": "medium",
+     "reason": "At least one side failed to score in 6 of Perfect's last 10 home games and 6 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "OVER_1_5",
+     "estimate": 0.95,
+     "risk_band": "low",
+     "reason": "2 or more goals in 10 of Perfect's last 10 home games and 10 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "UNDER_1_5",
+     "estimate": 0,
+     "risk_band": "high",
+     "reason": "1 goal or none in 0 of Perfect's last 10 home games and 0 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "OVER_2_5",
+     "estimate": 0.75,
+     "risk_band": "low",
+     "reason": "3 or more goals in 8 of Perfect's last 10 home games and 7 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "UNDER_2_5",
+     "estimate": 0.25,
+     "risk_band": "high",
+     "reason": "2 goals or fewer in 2 of Perfect's last 10 home games and 3 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "OVER_3_5",
+     "estimate": 0.5,
+     "risk_band": "medium",
+     "reason": "4 or more goals in 5 of Perfect's last 10 home games and 5 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "UNDER_3_5",
+     "estimate": 0.5,
+     "risk_band": "medium",
+     "reason": "3 goals or fewer in 5 of Perfect's last 10 home games and 5 of Hopeless's last 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "HOME_TO_SCORE",
+     "estimate": 0.95,
+     "risk_band": "low",
+     "reason": "Perfect scored in 10 of last 10 home games; Hopeless kept 0 clean sheets in 10 away.",
+     "sample_size": 10,
+     "low_confidence": false
+    },
+    {
+     "market": "AWAY_TO_SCORE",
+     "estimate": 0.4,
+     "risk_band": "high",
+     "reason": "Hopeless scored in 4 of last 10 away games; Perfect kept 6 clean sheets in 10 at home.",
+     "sample_size": 10,
+     "low_confidence": false
+    }
+   ],
+   "swaps": {
+    "HOME_WIN": [],
+    "DRAW": [
+     "DC_1X",
+     "OVER_1_5"
+    ],
+    "AWAY_WIN": [
+     "OVER_1_5",
+     "HOME_TO_SCORE"
+    ],
+    "DC_1X": [],
+    "DC_X2": [
+     "DC_1X",
+     "OVER_1_5"
+    ],
+    "BTTS_YES": [
+     "HOME_WIN",
+     "DC_1X"
+    ],
+    "BTTS_NO": [
+     "HOME_WIN",
+     "DC_1X"
+    ],
+    "OVER_1_5": [],
+    "UNDER_1_5": [
+     "HOME_WIN",
+     "DC_1X"
+    ],
+    "OVER_2_5": [],
+    "UNDER_2_5": [
+     "HOME_WIN",
+     "DC_1X"
+    ],
+    "OVER_3_5": [
+     "HOME_WIN",
+     "DC_1X"
+    ],
+    "UNDER_3_5": [
+     "HOME_WIN",
+     "DC_1X"
+    ],
+    "HOME_TO_SCORE": [],
+    "AWAY_TO_SCORE": [
+     "HOME_WIN",
+     "DC_1X"
+    ]
+   }
+  },
+  {
    "match_id": "arsenal-v-aston-villa",
    "home": {
     "team": "Arsenal",
@@ -7035,11 +7235,11 @@
    "legs": 2,
    "ticket": [
     {
-     "match_id": "brighton-v-chelsea",
-     "market": "DC_1X"
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
     },
     {
-     "match_id": "newcastle-v-tottenham",
+     "match_id": "brighton-v-chelsea",
      "market": "DC_1X"
     }
    ]
@@ -7050,15 +7250,15 @@
    "legs": 3,
    "ticket": [
     {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
+    {
      "match_id": "brighton-v-chelsea",
      "market": "DC_1X"
     },
     {
      "match_id": "newcastle-v-tottenham",
-     "market": "DC_1X"
-    },
-    {
-     "match_id": "celta-vigo-v-girona",
      "market": "DC_1X"
     }
    ]
@@ -7068,6 +7268,10 @@
    "risk": "safe",
    "legs": 5,
    "ticket": [
+    {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
     {
      "match_id": "brighton-v-chelsea",
      "market": "DC_1X"
@@ -7083,10 +7287,6 @@
     {
      "match_id": "betis-v-celta-vigo",
      "market": "DC_1X"
-    },
-    {
-     "match_id": "girona-v-real-madrid",
-     "market": "DC_1X"
     }
    ]
   },
@@ -7095,6 +7295,10 @@
    "risk": "safe",
    "legs": 10,
    "ticket": [
+    {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
     {
      "match_id": "brighton-v-chelsea",
      "market": "DC_1X"
@@ -7130,10 +7334,6 @@
     {
      "match_id": "brentford-v-brighton",
      "market": "DC_1X"
-    },
-    {
-     "match_id": "chelsea-v-everton",
-     "market": "DC_1X"
     }
    ]
   },
@@ -7143,8 +7343,8 @@
    "legs": 2,
    "ticket": [
     {
-     "match_id": "brighton-v-chelsea",
-     "market": "DC_1X"
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
     },
     {
      "match_id": "aston-villa-v-brentford",
@@ -7158,11 +7358,11 @@
    "legs": 3,
    "ticket": [
     {
-     "match_id": "brighton-v-chelsea",
-     "market": "DC_1X"
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
     },
     {
-     "match_id": "newcastle-v-tottenham",
+     "match_id": "brighton-v-chelsea",
      "market": "DC_1X"
     },
     {
@@ -7177,15 +7377,15 @@
    "legs": 5,
    "ticket": [
     {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
+    {
      "match_id": "brighton-v-chelsea",
      "market": "DC_1X"
     },
     {
      "match_id": "newcastle-v-tottenham",
-     "market": "DC_1X"
-    },
-    {
-     "match_id": "celta-vigo-v-girona",
      "market": "DC_1X"
     },
     {
@@ -7204,6 +7404,10 @@
    "legs": 10,
    "ticket": [
     {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
+    {
      "match_id": "brighton-v-chelsea",
      "market": "DC_1X"
     },
@@ -7217,10 +7421,6 @@
     },
     {
      "match_id": "betis-v-celta-vigo",
-     "market": "DC_1X"
-    },
-    {
-     "match_id": "girona-v-real-madrid",
      "market": "DC_1X"
     },
     {
@@ -7359,12 +7559,12 @@
    "legs": 2,
    "ticket": [
     {
-     "match_id": "bayer-leverkusen-v-bayern-munich",
-     "market": "UNDER_3_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "OVER_1_5"
     },
     {
-     "match_id": "arsenal-v-aston-villa",
-     "market": "OVER_1_5"
+     "match_id": "bayer-leverkusen-v-bayern-munich",
+     "market": "UNDER_3_5"
     }
    ]
   },
@@ -7374,15 +7574,15 @@
    "legs": 3,
    "ticket": [
     {
+     "match_id": "perfect-v-hopeless",
+     "market": "OVER_1_5"
+    },
+    {
      "match_id": "bayer-leverkusen-v-bayern-munich",
      "market": "UNDER_3_5"
     },
     {
      "match_id": "arsenal-v-aston-villa",
-     "market": "OVER_1_5"
-    },
-    {
-     "match_id": "aston-villa-v-brentford",
      "market": "OVER_1_5"
     }
    ]
@@ -7392,6 +7592,10 @@
    "risk": "safe",
    "legs": 5,
    "ticket": [
+    {
+     "match_id": "perfect-v-hopeless",
+     "market": "OVER_1_5"
+    },
     {
      "match_id": "bayer-leverkusen-v-bayern-munich",
      "market": "UNDER_3_5"
@@ -7407,10 +7611,6 @@
     {
      "match_id": "betis-v-celta-vigo",
      "market": "OVER_1_5"
-    },
-    {
-     "match_id": "girona-v-real-madrid",
-     "market": "HOME_TO_SCORE"
     }
    ]
   },
@@ -7419,6 +7619,10 @@
    "risk": "safe",
    "legs": 10,
    "ticket": [
+    {
+     "match_id": "perfect-v-hopeless",
+     "market": "OVER_1_5"
+    },
     {
      "match_id": "bayer-leverkusen-v-bayern-munich",
      "market": "UNDER_3_5"
@@ -7454,10 +7658,6 @@
     {
      "match_id": "everton-v-fulham",
      "market": "HOME_TO_SCORE"
-    },
-    {
-     "match_id": "liverpool-v-man-city",
-     "market": "OVER_1_5"
     }
    ]
   },
@@ -7471,8 +7671,8 @@
      "market": "UNDER_3_5"
     },
     {
-     "match_id": "brentford-v-brighton",
-     "market": "UNDER_2_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
     }
    ]
   },
@@ -7490,8 +7690,8 @@
      "market": "OVER_1_5"
     },
     {
-     "match_id": "brentford-v-brighton",
-     "market": "UNDER_2_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
     }
    ]
   },
@@ -7513,12 +7713,12 @@
      "market": "OVER_1_5"
     },
     {
-     "match_id": "brentford-v-brighton",
-     "market": "UNDER_2_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
     },
     {
-     "match_id": "brighton-v-chelsea",
-     "market": "AWAY_TO_SCORE"
+     "match_id": "brentford-v-brighton",
+     "market": "UNDER_2_5"
     }
    ]
   },
@@ -7548,6 +7748,10 @@
      "market": "HOME_TO_SCORE"
     },
     {
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
+    },
+    {
      "match_id": "brentford-v-brighton",
      "market": "UNDER_2_5"
     },
@@ -7562,10 +7766,6 @@
     {
      "match_id": "everton-v-fulham",
      "market": "BTTS_NO"
-    },
-    {
-     "match_id": "man-city-v-newcastle",
-     "market": "OVER_2_5"
     }
    ]
   },
@@ -7575,12 +7775,12 @@
    "legs": 2,
    "ticket": [
     {
-     "match_id": "brighton-v-chelsea",
-     "market": "AWAY_TO_SCORE"
+     "match_id": "brentford-v-brighton",
+     "market": "UNDER_2_5"
     },
     {
-     "match_id": "brentford-v-brighton",
-     "market": "OVER_2_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_YES"
     }
    ]
   },
@@ -7590,16 +7790,16 @@
    "legs": 3,
    "ticket": [
     {
+     "match_id": "brentford-v-brighton",
+     "market": "UNDER_2_5"
+    },
+    {
      "match_id": "brighton-v-chelsea",
      "market": "AWAY_TO_SCORE"
     },
     {
-     "match_id": "chelsea-v-everton",
+     "match_id": "perfect-v-hopeless",
      "market": "BTTS_YES"
-    },
-    {
-     "match_id": "brentford-v-brighton",
-     "market": "OVER_2_5"
     }
    ]
   },
@@ -7613,20 +7813,20 @@
      "market": "AWAY_TO_SCORE"
     },
     {
+     "match_id": "chelsea-v-everton",
+     "market": "BTTS_YES"
+    },
+    {
      "match_id": "everton-v-fulham",
      "market": "BTTS_NO"
     },
     {
-     "match_id": "man-city-v-newcastle",
-     "market": "OVER_2_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_YES"
     },
     {
      "match_id": "brentford-v-brighton",
      "market": "OVER_2_5"
-    },
-    {
-     "match_id": "chelsea-v-everton",
-     "market": "BTTS_NO"
     }
    ]
   },
@@ -7638,6 +7838,10 @@
     {
      "match_id": "brighton-v-chelsea",
      "market": "AWAY_TO_SCORE"
+    },
+    {
+     "match_id": "newcastle-v-tottenham",
+     "market": "BTTS_YES"
     },
     {
      "match_id": "barcelona-v-betis",
@@ -7652,8 +7856,8 @@
      "market": "AWAY_TO_SCORE"
     },
     {
-     "match_id": "real-sociedad-v-sevilla",
-     "market": "OVER_2_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_YES"
     },
     {
      "match_id": "brentford-v-brighton",
@@ -7670,10 +7874,6 @@
     {
      "match_id": "man-city-v-newcastle",
      "market": "UNDER_2_5"
-    },
-    {
-     "match_id": "newcastle-v-tottenham",
-     "market": "BTTS_NO"
     }
    ]
   },
@@ -7683,12 +7883,12 @@
    "legs": 2,
    "ticket": [
     {
-     "match_id": "bayer-leverkusen-v-bayern-munich",
-     "market": "UNDER_3_5"
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
     },
     {
-     "match_id": "arsenal-v-aston-villa",
-     "market": "OVER_1_5"
+     "match_id": "bayer-leverkusen-v-bayern-munich",
+     "market": "UNDER_3_5"
     }
    ]
   },
@@ -7698,15 +7898,15 @@
    "legs": 3,
    "ticket": [
     {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
+    {
      "match_id": "bayer-leverkusen-v-bayern-munich",
      "market": "UNDER_3_5"
     },
     {
      "match_id": "arsenal-v-aston-villa",
-     "market": "OVER_1_5"
-    },
-    {
-     "match_id": "aston-villa-v-brentford",
      "market": "OVER_1_5"
     }
    ]
@@ -7716,6 +7916,10 @@
    "risk": "safe",
    "legs": 5,
    "ticket": [
+    {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
     {
      "match_id": "bayer-leverkusen-v-bayern-munich",
      "market": "UNDER_3_5"
@@ -7731,10 +7935,6 @@
     {
      "match_id": "betis-v-celta-vigo",
      "market": "OVER_1_5"
-    },
-    {
-     "match_id": "girona-v-real-madrid",
-     "market": "HOME_TO_SCORE"
     }
    ]
   },
@@ -7743,6 +7943,10 @@
    "risk": "safe",
    "legs": 10,
    "ticket": [
+    {
+     "match_id": "perfect-v-hopeless",
+     "market": "HOME_WIN"
+    },
     {
      "match_id": "bayer-leverkusen-v-bayern-munich",
      "market": "UNDER_3_5"
@@ -7778,10 +7982,6 @@
     {
      "match_id": "everton-v-fulham",
      "market": "HOME_TO_SCORE"
-    },
-    {
-     "match_id": "liverpool-v-man-city",
-     "market": "OVER_1_5"
     }
    ]
   },
@@ -7795,8 +7995,8 @@
      "market": "UNDER_3_5"
     },
     {
-     "match_id": "aston-villa-v-brentford",
-     "market": "DC_X2"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
     }
    ]
   },
@@ -7814,8 +8014,8 @@
      "market": "OVER_1_5"
     },
     {
-     "match_id": "aston-villa-v-brentford",
-     "market": "DC_X2"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
     }
    ]
   },
@@ -7837,12 +8037,12 @@
      "market": "OVER_1_5"
     },
     {
-     "match_id": "aston-villa-v-brentford",
-     "market": "DC_X2"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
     },
     {
-     "match_id": "brentford-v-brighton",
-     "market": "UNDER_2_5"
+     "match_id": "aston-villa-v-brentford",
+     "market": "DC_X2"
     }
    ]
   },
@@ -7872,6 +8072,10 @@
      "market": "HOME_TO_SCORE"
     },
     {
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_NO"
+    },
+    {
      "match_id": "aston-villa-v-brentford",
      "market": "DC_X2"
     },
@@ -7886,10 +8090,6 @@
     {
      "match_id": "chelsea-v-everton",
      "market": "BTTS_YES"
-    },
-    {
-     "match_id": "everton-v-fulham",
-     "market": "BTTS_NO"
     }
    ]
   },
@@ -7899,12 +8099,12 @@
    "legs": 2,
    "ticket": [
     {
-     "match_id": "brentford-v-brighton",
-     "market": "UNDER_2_5"
+     "match_id": "aston-villa-v-brentford",
+     "market": "DC_X2"
     },
     {
-     "match_id": "aston-villa-v-brentford",
-     "market": "HOME_WIN"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_YES"
     }
    ]
   },
@@ -7914,16 +8114,16 @@
    "legs": 3,
    "ticket": [
     {
+     "match_id": "aston-villa-v-brentford",
+     "market": "DC_X2"
+    },
+    {
      "match_id": "brentford-v-brighton",
      "market": "UNDER_2_5"
     },
     {
-     "match_id": "brighton-v-chelsea",
-     "market": "AWAY_TO_SCORE"
-    },
-    {
-     "match_id": "aston-villa-v-brentford",
-     "market": "HOME_WIN"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_YES"
     }
    ]
   },
@@ -7933,6 +8133,10 @@
    "legs": 5,
    "ticket": [
     {
+     "match_id": "brentford-v-brighton",
+     "market": "UNDER_2_5"
+    },
+    {
      "match_id": "brighton-v-chelsea",
      "market": "AWAY_TO_SCORE"
     },
@@ -7941,16 +8145,12 @@
      "market": "BTTS_YES"
     },
     {
-     "match_id": "everton-v-fulham",
-     "market": "BTTS_NO"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_YES"
     },
     {
      "match_id": "aston-villa-v-brentford",
      "market": "HOME_WIN"
-    },
-    {
-     "match_id": "brentford-v-brighton",
-     "market": "OVER_2_5"
     }
    ]
   },
@@ -7962,6 +8162,10 @@
     {
      "match_id": "brighton-v-chelsea",
      "market": "AWAY_TO_SCORE"
+    },
+    {
+     "match_id": "man-city-v-newcastle",
+     "market": "OVER_2_5"
     },
     {
      "match_id": "newcastle-v-tottenham",
@@ -7976,8 +8180,8 @@
      "market": "BTTS_NO"
     },
     {
-     "match_id": "celta-vigo-v-girona",
-     "market": "AWAY_TO_SCORE"
+     "match_id": "perfect-v-hopeless",
+     "market": "BTTS_YES"
     },
     {
      "match_id": "aston-villa-v-brentford",
@@ -7994,10 +8198,6 @@
     {
      "match_id": "everton-v-fulham",
      "market": "BTTS_YES"
-    },
-    {
-     "match_id": "man-city-v-newcastle",
-     "market": "UNDER_2_5"
     }
    ]
   }

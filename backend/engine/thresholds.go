@@ -23,6 +23,9 @@ type Thresholds struct {
 	ValueMargin float64
 	// BoldFloor is the lowest estimate the wizard will ever use (4.6).
 	BoldFloor float64
+	// MaxEstimate caps every estimate, so the app never shows a near-certainty:
+	// 10 wins in 10 games is a good record, not a 100% chance (RG-1, agreed 2026-11-27).
+	MaxEstimate float64
 }
 
 // DefaultThresholds returns the values in the SRS.
@@ -36,6 +39,7 @@ func DefaultThresholds() Thresholds {
 		MaxSuggestions:     2,
 		ValueMargin:        0.05,
 		BoldFloor:          0.35,
+		MaxEstimate:        0.95,
 	}
 }
 
@@ -57,5 +61,7 @@ func (t Thresholds) Validate() error {
 	check(t.ValueMargin >= 0 && t.ValueMargin < 1, "value margin must be between 0 and 1, got %.2f", t.ValueMargin)
 	check(t.BoldFloor > 0 && t.BoldFloor < t.MediumFrom,
 		"bold floor must be above 0 and below medium_from, got %.2f", t.BoldFloor)
+	check(t.MaxEstimate > t.LowFrom && t.MaxEstimate <= 1,
+		"max estimate must be above low_from and at most 1, got %.2f", t.MaxEstimate)
 	return errors.Join(errs...)
 }

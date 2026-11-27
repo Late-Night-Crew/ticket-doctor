@@ -22,9 +22,25 @@ interface Pair {
   away: TeamProfile
 }
 
-/** Neighbouring teams in each league, plus the last pair reversed (a promoted side at home). */
+/**
+ * A home side with a perfect record against an away side that lost every game:
+ * several raw estimates reach 100%, so the 95% cap (RULES.maxEstimate) is checked.
+ */
+const PERFECT: Pair = {
+  match_id: 'perfect-v-hopeless',
+  home: {
+    team: 'Perfect', venue: 'home', sample_size: 10, win_rate: 1, draw_rate: 0, loss_rate: 0, scored_rate: 1,
+    clean_sheet_rate: 0.6, btts_rate: 0.4, over15_rate: 1, over25_rate: 0.8, under35_rate: 0.5,
+  },
+  away: {
+    team: 'Hopeless', venue: 'away', sample_size: 10, win_rate: 0, draw_rate: 0, loss_rate: 1, scored_rate: 0.4,
+    clean_sheet_rate: 0, btts_rate: 0.4, over15_rate: 1, over25_rate: 0.7, under35_rate: 0.5,
+  },
+}
+
+/** Neighbouring teams in each league, plus the last pair reversed (a promoted side at home), plus PERFECT. */
 function pairs(): Pair[] {
-  const out: Pair[] = []
+  const out: Pair[] = [PERFECT]
   for (const league of LEAGUES) {
     const teams = TEAMS.filter((t) => t.league_id === league.id)
     for (let i = 0; i + 1 < teams.length; i++) {
@@ -67,6 +83,13 @@ function build() {
 }
 
 describe('engine parity (TypeScript mock vs Go engine)', () => {
+  it('caps estimates at 95%, keeping the real record in the reason', () => {
+    const win = estimateMarket('HOME_WIN', PERFECT.home, PERFECT.away)
+    expect(win.estimate).toBe(0.95)
+    expect(win.reason).toContain('won 10 of last 10 home games')
+    for (const m of MARKETS) expect(estimateMarket(m.key, PERFECT.home, PERFECT.away).estimate).toBeLessThanOrEqual(0.95)
+  })
+
   it('matches the golden file shared with backend/engine', () => {
     const actual = build()
     if (process.env.UPDATE_PARITY === '1') {

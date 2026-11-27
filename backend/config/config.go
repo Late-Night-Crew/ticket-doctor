@@ -59,6 +59,7 @@ type RulesConfig struct {
 	MaxSuggestions     int     `mapstructure:"max_suggestions"`
 	ValueMargin        float64 `mapstructure:"value_margin"`
 	BoldFloor          float64 `mapstructure:"bold_floor"`
+	MaxEstimate        float64 `mapstructure:"max_estimate"`
 }
 
 // Thresholds converts the config section for the engine.
@@ -72,6 +73,7 @@ func (r RulesConfig) Thresholds() engine.Thresholds {
 		MaxSuggestions:     r.MaxSuggestions,
 		ValueMargin:        r.ValueMargin,
 		BoldFloor:          r.BoldFloor,
+		MaxEstimate:        r.MaxEstimate,
 	}
 }
 
@@ -85,6 +87,7 @@ func rulesFrom(t engine.Thresholds) RulesConfig {
 		MaxSuggestions:     t.MaxSuggestions,
 		ValueMargin:        t.ValueMargin,
 		BoldFloor:          t.BoldFloor,
+		MaxEstimate:        t.MaxEstimate,
 	}
 }
 

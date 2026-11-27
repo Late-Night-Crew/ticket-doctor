@@ -156,11 +156,16 @@ export interface HitCount {
 export interface ResultsRow {
   league_id: string
   market: MarketKey
+  /** Users' own picks in this market (a swap they accepted is not counted here). */
   original: HitCount
+  /** Our suggestions in this market, accepted or not. */
   suggested: HitCount
+  /** Users' picks in this market that we suggested a swap for: the like-for-like group (SRS addendum A6). */
+  original_with_suggestion: HitCount
 }
 
 export interface ResultsResponse {
-  updated_at: string
+  /** When results were last imported; null before the first import. */
+  updated_at: string | null
   rows: ResultsRow[]
 }

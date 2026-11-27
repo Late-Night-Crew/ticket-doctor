@@ -266,6 +266,8 @@ export const COPY = {
     allMarkets: 'All markets',
     original: 'Original picks',
     originalHelp: 'Legs as people entered them',
+    offered: 'Picks we offered a swap for',
+    offeredHelp: 'The same legs our swaps replaced: compare these with our swaps',
     suggested: 'Suggested swaps',
     suggestedHelp: 'Our alternatives, whether accepted or not',
     won: 'won',
@@ -279,7 +281,10 @@ export const COPY = {
     updated: (when: string) => `Updated ${when}.`,
     pendingNote: 'Matches not yet played are not counted.',
     groupsNote:
-      'Swaps are only suggested for Medium and High-risk legs, so the two groups are not the same picks and their rates are not a like-for-like comparison.',
+      'Swaps are only suggested for Medium and High-risk legs, which win less often, so compare our swaps with "Picks we offered a swap for", not with every original pick.',
+    countingNote:
+      'Each match on a ticket counts once, however many times the ticket was analysed. A swap someone accepted counts as ours, not as their pick.',
+    notUpdated: 'No results have been imported yet.',
     pastNote: 'Past results do not predict future ones.',
     empty: 'No settled results for these filters yet.',
     error: 'Could not load the track record.',
