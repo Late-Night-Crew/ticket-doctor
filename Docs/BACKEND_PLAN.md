@@ -12,21 +12,21 @@ Sources:
 football-data.co.uk CSVs ──┐  results + odds
 football-data.org API ─────┤  upcoming fixtures (D4)
                            ▼
-           ticketdoctor import   (GitHub Actions, daily cron)
+           ticketdoctor import   (GitHub Actions, twice a day, latest release image)
            1. upsert matches (results + upcoming fixtures)
-           2. settle analysed legs and suggestions (FR-7.2)
-           3. recompute team_profiles (FR-2)
+           2. recompute team_profiles (FR-2)
+              (legs are settled from the score when results are read, B4)
                            │
                            ▼
-                    PostgreSQL ◄──────────── ticketdoctor server (Render)
+              PostgreSQL (Render) ◄──────── ticketdoctor server (Render, image)
                                                reads cached rows only,
                                                runs engine/ per request
-                                                       ▲
-                                    React app (Vercel) ┘ /api/...
+                                                       ▲ /api/* rewrite
+                              React app (Render static site, same address)
 ```
 
 - **Ticket requests never call an outside API** (SRS 2.3, NFR-1). A 15-leg analysis is two queries (matches, profiles) plus pure engine code.
-- **The import runs from GitHub Actions on a schedule, not inside the server.** Render's free tier sleeps when idle, so an in-process scheduler would miss runs. A daily database write also stops a Supabase free database from pausing.
+- **The import runs from GitHub Actions on a schedule, not inside the server.** Render's free tier sleeps when idle, so an in-process scheduler would miss runs, and Render's cron jobs aren't free.
 
 ## 2. Stack
 
@@ -143,7 +143,7 @@ Each milestone ends with green CI and a pull request.
   - **Checked live:**
     - The real API on the local database, with the production frontend build in headless Chrome: builder, analysis, swap with Undo, and results worked, with no console errors.
     - A 15-leg analysis took about 30 ms, or 0.6 s on the first request while the database connection opens.
-  - **For B5:** analysis makes about 2 queries per leg. On Supabase the cost is network round trips, so keep the API and database in the same region.
+  - **For B5:** analysis makes about 2 queries per leg. On a hosted database the cost is network round trips, so the API and database share a region (Frankfurt).
 
 **B4 Settlement and track record (SRS M5)**
 - ~~The import settles finished matches~~: B3 settles when results are read, so nothing is stored and a corrected score fixes itself.
@@ -153,14 +153,24 @@ Each milestone ends with green CI and a pull request.
 
 **Release process (added 2026-11-26).** Tag-based releases are in place: `v0.1.0` exists, and `release.yml` checks the tagged commit, builds `ghcr.io/late-night-crew/ticket-doctor-api:<tag>` and creates the GitHub Release. See [RELEASING.md](../RELEASING.md). Every migration from B2 on must follow its backward-compatibility rule.
 
-**B5 Go live (SRS M4)**
-- Database host (D2). `Dockerfile` and `deploy/start.sh` already exist (release tooling).
-- Render as an image-backed service pulling from ghcr.io. The package is private while the repo is private, so Render needs registry credentials until then.
-- `release.yml` deploy jobs: deploy the tagged image to Render and the frontend to Vercel, with Vercel's Git production deploys switched off.
-- `.github/workflows/import.yml` (daily cron, `TD_DATABASE_URL` stored as a repository secret).
-- Vercel `VITE_API_URL`, CORS, and the frontend Content-Security-Policy header.
-- Make the repository public (needed for Render's free tier).
-- Done when production serves real fixtures and the cron has run three days without errors.
+**B5 Go live (SRS M4): code done 2026-11-27; setup in [DEPLOY.md](DEPLOY.md)**
+- Done when production serves real fixtures and the import has run three days without errors.
+- **Decided 2026-11-27: everything on Render**, in Frankfurt, closest to Malawi (D2 changed). Free Postgres expires after 30 days, which is enough for the trial period; after it, decide on a paid plan with real usage data.
+- **`render.yaml` (Blueprint):**
+  - the database;
+  - the API as an image-backed service (`ghcr.io/late-night-crew/ticket-doctor-api`, health check `/api/health`);
+  - the frontend as a static site in `frontend/` with auto-deploy off.
+- **Same address for the frontend and the API:** the static site forwards `/api/*` to the API. The frontend needs no `VITE_API_URL`, the API needs no CORS for it, and the Content-Security-Policy is `'self'` throughout. Checked with the production build behind the same headers and `/api` proxy in headless Chrome, with no violations.
+- **Rate limit sees visitors, not proxies:** `TD_TRUSTED_PROXIES` trusts Render's proxies (only they can reach the container), so the per-IP limit uses each visitor's address.
+- **`release.yml` deploy job:**
+  - deploys the tag's image (Render API `imageUrl`) and the tag's commit for the frontend (`commitId`);
+  - waits until both are live;
+  - checks `SITE_URL/api/health` reports the tag.
+
+  Rollback = running the workflow for an older tag. The job skips with a notice until the Render secret and variables exist.
+- **`import.yml`:** twice a day (04:15 and 22:15 UTC), it runs `migrate` then `import` from the **latest release's image**, never unreleased code. It skips with a notice until `TD_DATABASE_URL` exists.
+- **Repository made public** 2026-11-27, after checking every commit on every branch for the API key and database password (none found).
+- **Removed:** `frontend/vercel.json` and every Supabase reference.
 
 **B6 Admin (F7)**
 - Manual result entry, threshold view.
@@ -171,7 +181,7 @@ Each milestone ends with green CI and a pull request.
 | # | Decision | Recommendation |
 |---|---|---|
 | D1 | ~~Fiber v2 or v3?~~ | **Decided 2026-11-26: v3** |
-| D2 | ~~Database host~~ | **Decided 2026-11-26: Supabase** (Postgres). The daily import keeps the free tier from pausing; the API connects with the connection string in `TD_DATABASE_URL` |
+| D2 | ~~Database host~~ | ~~Supabase~~ (2026-11-26). **Changed 2026-11-27: Render Postgres**, next to the API, so everything is in one place. The free database expires after 30 days: upgrade or export the ticket log before then ([DEPLOY.md](DEPLOY.md)) |
 | D3 | ~~Module name~~ | **`ticketdoctor`** (used in B0) |
 | D4 | ~~Fixtures source (FR-1.2)~~ | **Decided 2026-11-27: football-data.org** (free tier, 10 requests a minute). The key goes in `TD_FOOTBALL_DATA_ORG_TOKEN`, or `football_data_org.token` in the untracked `config.yaml`; for B5 it becomes a repository secret for the import cron |
 | D5 | **Admin auth (open question 6)** | Reuse the nsms JWT login with admin users created from config; decide before B6 |

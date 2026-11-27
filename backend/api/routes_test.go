@@ -140,3 +140,37 @@ func TestPostsAreRateLimited(t *testing.T) {
 		t.Fatalf("GET after the POST limit: %d", res.StatusCode)
 	}
 }
+
+// With render.yaml's TD_TRUSTED_PROXIES, the limit applies per visitor
+// (X-Forwarded-For), not to Render's proxy address that every request shares.
+func TestRateLimitIsPerVisitorBehindTrustedProxies(t *testing.T) {
+	a, _ := newDataAPI(t)
+	cfg := config.Defaults()
+	if err := cfg.ApplyEnvironment(func(k string) (string, bool) {
+		if k == "TD_TRUSTED_PROXIES" {
+			return "0.0.0.0/0,::/0", true // the value in render.yaml
+		}
+		return "", false
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("render.yaml's proxies rejected: %v", err)
+	}
+	a = New(cfg, a.logger, "test", a.deps)
+
+	post := func(visitor string) int {
+		req := httptest.NewRequest("POST", "/api/suggestions/1/accept", nil)
+		req.Header.Set("X-Forwarded-For", visitor)
+		return do(t, a, req).StatusCode
+	}
+	for range postsPerMinute {
+		post("198.51.100.7")
+	}
+	if got := post("198.51.100.7"); got != 429 {
+		t.Fatalf("visitor over the limit got %d, want 429", got)
+	}
+	if got := post("203.0.113.9"); got == 429 {
+		t.Fatal("another visitor was limited too: the limit is keyed on the proxy, not the visitor")
+	}
+}

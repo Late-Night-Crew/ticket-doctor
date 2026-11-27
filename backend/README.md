@@ -47,7 +47,7 @@ task test
 
 Never point it at your development database: the tests empty the tables.
 
-`config.yaml` is gitignored, so the password stays on your machine. No local Postgres? `task db:up` starts one in Docker on port 55432 (see `config.example.yaml`). Supabase comes in B5, through `TD_DATABASE_URL`.
+`config.yaml` is gitignored, so the password stays on your machine. No local Postgres? `task db:up` starts one in Docker on port 55432 (see `config.example.yaml`). Production uses Render's Postgres through `TD_DATABASE_URL`; see [../Docs/DEPLOY.md](../Docs/DEPLOY.md).
 
 ## Layout
 

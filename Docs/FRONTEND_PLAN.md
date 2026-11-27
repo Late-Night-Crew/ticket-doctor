@@ -19,7 +19,7 @@ The SRS builds the UI in milestone M3, after the data and analyser core. We are 
 | F3 | Analysis screen | FR-4, FR-5, FR-6 | Done |
 | F4 | Ticket wizard (beginner and guided paths) | FR-8, RG-6 | Done |
 | F5 | Results page | FR-7.3, RG-3 | Done |
-| F6 | Performance and accessibility pass, Vercel deploy setup | NFR-2, NFR-3 | Done |
+| F6 | Performance and accessibility pass, deploy setup | NFR-2, NFR-3 | Done (hosting moved to Render in B5) |
 | F7 | Admin: manual result entry, threshold view | FR-1.4 (Should) | Waiting on open question 6 (admin access) |
 
 ## API contract
@@ -149,13 +149,13 @@ Market keys: `HOME_WIN, AWAY_WIN, DRAW, DC_1X, DC_X2, BTTS_YES, BTTS_NO, OVER_1_
 On Slow 3G about 4 s is network round-trip latency (2 s per round trip in the DevTools profile), which no frontend change can remove. Repeat visits load the hashed assets from cache (`immutable`).
 
 **Deploy:**
-- `frontend/vercel.json`: client-side routing fallback, one-year immutable cache on `/assets`, security headers.
+- ~~`frontend/vercel.json`~~ replaced in B5 by the static site in `render.yaml`: client-side routing fallback, one-year immutable cache on `/assets`, security headers, and now a Content-Security-Policy.
 - `.env.production` defaults to the real API; mocks can be turned on for Preview deploys.
 - The MSW worker file and mock code are left out of builds unless mocks are on (checked).
 
 **Tests:** Testing Library's wait was raised to 3 s, because tests that go through the mock API timed out at the 1 s default on a busy machine.
 
-**Not done:** a Content-Security-Policy header, because it needs the final API domain for `connect-src`. Add it once the Render URL is known.
+**Content-Security-Policy (added in B5):** set on the Render static site (`render.yaml`). The API is served from the same address through a rewrite, so every directive is `'self'`, plus `data:` for Bootstrap's inline SVG icons. Checked with the production build in headless Chrome: no violations on the builder, analysis, swap, glossary, theme toggle, wizard or results.
 
 ## Agreed SRS additions
 

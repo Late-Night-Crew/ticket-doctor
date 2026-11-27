@@ -102,7 +102,7 @@ type ServerConfig struct {
 }
 
 // DatabaseConfig connects to Postgres either with separate fields (local
-// development, same style as nsms) or with one connection string (Supabase).
+// development, same style as nsms) or with one connection string (Render).
 // When URL is set it wins and the fields are ignored.
 type DatabaseConfig struct {
 	Host     string `mapstructure:"host"`
@@ -114,11 +114,11 @@ type DatabaseConfig struct {
 	// Sslmode is disable for a local database, require for a remote one.
 	Sslmode string `mapstructure:"sslmode"`
 
-	// URL is a full connection string, e.g. from Supabase. Set it with
+	// URL is a full connection string, e.g. from Render. Set it with
 	// TD_DATABASE_URL rather than in the file: it contains the password.
 	URL string `mapstructure:"url"`
 
-	// MaxConns caps the connection pool. Supabase's free tier allows few connections.
+	// MaxConns caps the connection pool. Free database plans allow few connections.
 	MaxConns int32 `mapstructure:"max_conns"`
 }
 
@@ -216,7 +216,7 @@ func Load(path string) (*Config, error) {
 // os.LookupEnv in production and a map in tests.
 //
 //	TD_ENVIRONMENT        DEVELOPMENT or PRODUCTION
-//	TD_DATABASE_URL       full Postgres connection string, e.g. Supabase (secret)
+//	TD_DATABASE_URL       full Postgres connection string, e.g. Render's (secret)
 //	TD_DATABASE_PASSWORD  password for the host/port/name fields (secret)
 //	TD_HOST, TD_PORT      listen address; PORT (set by Render) also works
 //	TD_ALLOWED_ORIGINS    comma-separated frontend origins
