@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,6 +20,7 @@ import (
 	"ticketdoctor/engine"
 	"ticketdoctor/logging/loggedmodule"
 	"ticketdoctor/pkg/footballdata"
+	"ticketdoctor/pkg/footballdataorg"
 	"ticketdoctor/pkg/teamnames"
 )
 
@@ -40,11 +42,19 @@ func (d DirSource) Results(_ context.Context, division, season string) ([]footba
 	return footballdata.Parse(f)
 }
 
+// FixturesSource supplies a league's upcoming fixtures between two dates.
+type FixturesSource interface {
+	Fixtures(ctx context.Context, code string, from, to time.Time) ([]footballdataorg.Fixture, error)
+}
+
 // ImportOptions chooses what to import. Empty Leagues means every league with
 // a football-data.co.uk code.
 type ImportOptions struct {
 	Leagues []string
 	Seasons []string
+	// FixturesFrom and FixturesTo are the kick-off dates to import fixtures
+	// for. Used only when the service has a fixtures source.
+	FixturesFrom, FixturesTo time.Time
 }
 
 // LeagueImport is what an import did for one league.
@@ -61,7 +71,25 @@ type LeagueImport struct {
 	Profiles      int      `json:"profiles"`
 	// LowConfidence lists teams with a home or away profile below the cut-off.
 	LowConfidence []string `json:"low_confidence,omitempty"`
-	Error         string   `json:"error,omitempty"`
+	// Fixtures is nil when fixtures weren't imported.
+	Fixtures *FixtureImport `json:"fixtures,omitempty"`
+	Error    string         `json:"error,omitempty"`
+}
+
+// FixtureImport is what the fixtures part of a league import did.
+type FixtureImport struct {
+	Rows      int `json:"rows"`
+	Inserted  int `json:"inserted"`
+	Updated   int `json:"updated"`
+	Unchanged int `json:"unchanged"`
+	// Postponed counts fixtures the source marks postponed, suspended or cancelled.
+	Postponed int `json:"postponed"`
+	// Played counts games in play or finished, left to the results import.
+	Played int `json:"played"`
+	// Unmatched lists club names that matched no team. Those fixtures are
+	// skipped; fix them with an alias in pkg/teamnames.
+	Unmatched []string `json:"unmatched,omitempty"`
+	Error     string   `json:"error,omitempty"`
 }
 
 // ImportSummary is stored on the import_runs row and logged.
@@ -73,15 +101,23 @@ type ImportSummary struct {
 // ImportService loads results into the database and rebuilds team profiles
 // (FR-1.1, FR-1.3, FR-1.5, FR-2).
 type ImportService struct {
-	pool   *pgxpool.Pool
-	q      *dbsqlc.Queries
-	source ResultsSource
-	engine *engine.Engine
-	logger *slog.Logger
+	pool     *pgxpool.Pool
+	q        *dbsqlc.Queries
+	source   ResultsSource
+	fixtures FixturesSource // nil: results only
+	engine   *engine.Engine
+	logger   *slog.Logger
 }
 
 func NewImportService(pool *pgxpool.Pool, source ResultsSource, eng *engine.Engine, logger *slog.Logger) *ImportService {
 	return &ImportService{pool: pool, q: dbsqlc.New(pool), source: source, engine: eng, logger: logger}
+}
+
+// WithFixtures makes the import also load upcoming fixtures (FR-1.2) for
+// leagues with a football-data.org code.
+func (s *ImportService) WithFixtures(src FixturesSource) *ImportService {
+	s.fixtures = src
+	return s
 }
 
 // maxSkippedSample caps how many skipped-row messages are kept per league.
@@ -99,6 +135,9 @@ func (s *ImportService) Run(ctx context.Context, opts ImportOptions) (*ImportSum
 			return nil, err
 		}
 	}
+	if s.fixtures != nil && (opts.FixturesFrom.IsZero() || opts.FixturesTo.Before(opts.FixturesFrom)) {
+		return nil, errors.New("fixtures need a date range (FixturesFrom up to FixturesTo)")
+	}
 	leagues, err := s.leagues(ctx, opts.Leagues)
 	if err != nil {
 		return nil, err
@@ -112,7 +151,7 @@ func (s *ImportService) Run(ctx context.Context, opts ImportOptions) (*ImportSum
 
 	var failed []string
 	for _, l := range leagues {
-		li, err := s.importLeague(ctx, l, opts.Seasons)
+		li, err := s.importLeague(ctx, l, opts)
 		if err != nil {
 			li.Error = err.Error()
 			failed = append(failed, l.ID)
@@ -167,7 +206,8 @@ func (s *ImportService) leagues(ctx context.Context, only []string) ([]dbsqlc.Le
 	return out, nil
 }
 
-func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, seasons []string) (LeagueImport, error) {
+func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, opts ImportOptions) (LeagueImport, error) {
+	seasons := opts.Seasons
 	li := LeagueImport{League: l.ID, Seasons: seasons}
 
 	// Download everything first, so no transaction stays open during network calls.
@@ -189,6 +229,19 @@ func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, seaso
 		}
 		li.Rows += len(matches)
 		data = append(data, seasonRows{season, matches})
+	}
+
+	// A fixtures download failure doesn't stop the results: they're saved, and
+	// the league is still reported as failed so the daily job shows the problem.
+	var fixtures []footballdataorg.Fixture
+	var fixturesErr error
+	if s.fixtures != nil && l.FdoCode != nil {
+		li.Fixtures = &FixtureImport{}
+		fixtures, fixturesErr = s.fixtures.Fixtures(ctx, *l.FdoCode, opts.FixturesFrom, opts.FixturesTo)
+		if fixturesErr != nil {
+			li.Fixtures.Error = fixturesErr.Error()
+		}
+		li.Fixtures.Rows = len(fixtures)
 	}
 
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -232,6 +285,12 @@ func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, seaso
 		}
 		li.NewTeams = teams.created
 
+		// After the results, so a game that has just finished is already saved
+		// as finished and the fixture can't overwrite it.
+		if err := s.saveFixtures(ctx, q, l.ID, teams, fixtures, li.Fixtures); err != nil {
+			return err
+		}
+
 		profiles, low, err := s.rebuildProfiles(ctx, q, l.ID)
 		li.Profiles, li.LowConfidence = profiles, low
 		return err
@@ -239,13 +298,78 @@ func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, seaso
 	if err != nil {
 		// The transaction rolled back: nothing from this league was saved.
 		li.Inserted, li.Updated, li.Unchanged, li.NewTeams, li.Profiles, li.LowConfidence = 0, 0, 0, nil, 0, nil
+		if li.Fixtures != nil {
+			li.Fixtures = &FixtureImport{Rows: li.Fixtures.Rows, Error: li.Fixtures.Error}
+		}
 		return li, err
 	}
 	s.logger.Info("league imported", loggedmodule.Attr(loggedmodule.Import),
 		"league", l.ID, "rows", li.Rows, "inserted", li.Inserted, "updated", li.Updated,
 		"unchanged", li.Unchanged, "skipped_rows", li.SkippedRows, "new_teams", len(li.NewTeams),
 		"profiles", li.Profiles, "low_confidence_teams", len(li.LowConfidence))
+	if fx := li.Fixtures; fx != nil {
+		s.logger.Info("fixtures imported", loggedmodule.Attr(loggedmodule.Import),
+			"league", l.ID, "rows", fx.Rows, "inserted", fx.Inserted, "updated", fx.Updated,
+			"unchanged", fx.Unchanged, "postponed", fx.Postponed, "played", fx.Played, "unmatched", fx.Unmatched)
+	}
+	switch {
+	case fixturesErr != nil:
+		return li, fmt.Errorf("fixtures (results were saved): %w", fixturesErr)
+	case li.Fixtures != nil && len(li.Fixtures.Unmatched) > 0:
+		return li, fmt.Errorf("fixtures: no team matches %q; add an alias in pkg/teamnames (the other fixtures were saved)", li.Fixtures.Unmatched)
+	}
 	return li, nil
+}
+
+// saveFixtures upserts upcoming and postponed fixtures. It never adds teams:
+// every club in a league has results, so a name that matches nothing is a
+// spelling the alias table doesn't know yet, and adding it would create a
+// duplicate club.
+func (s *ImportService) saveFixtures(ctx context.Context, q *dbsqlc.Queries, league string, teams *teamResolver, fixtures []footballdataorg.Fixture, fx *FixtureImport) error {
+	if fx == nil { // results-only import
+		return nil
+	}
+	unmatched := map[string]bool{}
+	for _, f := range fixtures {
+		if f.Status == footballdataorg.Skip {
+			fx.Played++
+			continue
+		}
+		home, okHome := teams.find(f.Home.Name, f.Home.ShortName)
+		away, okAway := teams.find(f.Away.Name, f.Away.ShortName)
+		if !okHome {
+			unmatched[f.Home.Name] = true
+		}
+		if !okAway {
+			unmatched[f.Away.Name] = true
+		}
+		if !okHome || !okAway {
+			continue
+		}
+		if f.Status == footballdataorg.Postponed {
+			fx.Postponed++
+		}
+		row, err := q.UpsertFixture(ctx, dbsqlc.UpsertFixtureParams{
+			LeagueID: league, Season: f.Season, Kickoff: f.Kickoff,
+			HomeTeamID: home, AwayTeamID: away, Status: string(f.Status),
+			Source: "football-data.org",
+		})
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			fx.Unchanged++
+		case err != nil:
+			return fmt.Errorf("save fixture %s v %s (%d): %w", f.Home.Name, f.Away.Name, f.ID, err)
+		case row.Inserted:
+			fx.Inserted++
+		default:
+			fx.Updated++
+		}
+	}
+	for name := range unmatched {
+		fx.Unmatched = append(fx.Unmatched, name)
+	}
+	sort.Strings(fx.Unmatched)
+	return nil
 }
 
 // rebuildProfiles recomputes every team's home and away profile and last-5
@@ -326,6 +450,18 @@ func newTeamResolver(ctx context.Context, q *dbsqlc.Queries, league string) (*te
 		}
 	}
 	return r, nil
+}
+
+// find looks a club up by any of its names, without adding it.
+func (r *teamResolver) find(names ...string) (int64, bool) {
+	for _, n := range names {
+		if key := teamnames.Key(n); key != "" {
+			if id, ok := r.byKey[key]; ok {
+				return id, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func (r *teamResolver) resolve(ctx context.Context, name string) (int64, error) {

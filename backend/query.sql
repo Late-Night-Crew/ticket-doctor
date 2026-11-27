@@ -53,6 +53,21 @@ WHERE (matches.kickoff, matches.status, matches.home_goals, matches.away_goals,
        EXCLUDED.odds_home, EXCLUDED.odds_draw, EXCLUDED.odds_away)
 RETURNING id, (xmax = 0)::boolean AS inserted;
 
+-- name: UpsertFixture :one
+-- Inserts an upcoming fixture, or updates its kick-off or status. A finished
+-- match is never touched: its result comes from the results import. Returns
+-- whether a row was inserted; returns no row at all when nothing changed.
+INSERT INTO matches (league_id, season, kickoff, home_team_id, away_team_id, status, source)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (league_id, season, home_team_id, away_team_id) DO UPDATE
+SET kickoff    = EXCLUDED.kickoff,
+    status     = EXCLUDED.status,
+    source     = EXCLUDED.source,
+    updated_at = now()
+WHERE matches.status <> 'finished'
+  AND (matches.kickoff, matches.status) IS DISTINCT FROM (EXCLUDED.kickoff, EXCLUDED.status)
+RETURNING id, (xmax = 0)::boolean AS inserted;
+
 -- name: ListFinishedMatchesByLeague :many
 -- Every finished match in a league, newest first, for building profiles.
 SELECT home_team_id, away_team_id, kickoff, home_goals, away_goals

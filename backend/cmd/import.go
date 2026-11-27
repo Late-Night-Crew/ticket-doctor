@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -10,25 +11,34 @@ import (
 	"ticketdoctor/engine"
 	"ticketdoctor/logging/loggedmodule"
 	"ticketdoctor/pkg/footballdata"
+	"ticketdoctor/pkg/footballdataorg"
 	"ticketdoctor/services"
 )
 
 var importFlags struct {
-	leagues []string
-	seasons []string
-	fromDir string
+	leagues    []string
+	seasons    []string
+	fromDir    string
+	noFixtures bool
 }
 
 var importCmd = &cobra.Command{
 	Use:   "import",
-	Short: "Import results from football-data.co.uk and rebuild team profiles",
-	Long: `Downloads each league's results for the current and previous season,
-saves new or changed matches, and rebuilds every team's home and away profile.
+	Short: "Import results and upcoming fixtures, and rebuild team profiles",
+	Long: `Downloads each league's results for the current and previous season from
+football-data.co.uk, and its upcoming fixtures (from yesterday to
+football_data_org.days_ahead days ahead) from football-data.org. Saves new or
+changed matches and rebuilds every team's home and away profile.
 Safe to run again: unchanged matches are left as they are.
+
+Fixtures need a football-data.org API key (TD_FOOTBALL_DATA_ORG_TOKEN, or
+football_data_org.token in config.yaml). Without one, development imports
+results only; PRODUCTION refuses to run.
 
 This is the daily job (run by GitHub Actions, not by the server).`,
 	Example: `  ticketdoctor import
   ticketdoctor import --league epl --season 2627
+  ticketdoctor import --no-fixtures                # results only
   ticketdoctor import --from-dir ./downloads     # reads ./downloads/<season>/<division>.csv`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Minute)
@@ -60,13 +70,29 @@ This is the daily job (run by GitHub Actions, not by the server).`,
 		if importFlags.fromDir != "" {
 			source = services.DirSource{Dir: importFlags.fromDir}
 		}
+		svc := services.NewImportService(pool, source, eng, logger)
+
+		opts := services.ImportOptions{Leagues: importFlags.leagues, Seasons: seasons}
+		token := cfg.FootballDataOrg.Token
+		switch {
+		case importFlags.noFixtures:
+		case token == "" && cfg.IsProduction():
+			return errors.New("no football-data.org API key: set TD_FOOTBALL_DATA_ORG_TOKEN, or pass --no-fixtures")
+		case token == "":
+			logger.Warn("no football-data.org API key: importing results only",
+				loggedmodule.Attr(loggedmodule.Import), "fix", "set football_data_org.token in config.yaml")
+		default:
+			svc.WithFixtures(footballdataorg.NewClient(token))
+			// From yesterday (UTC), so a game postponed at the last minute is still
+			// seen and marked postponed.
+			today := time.Now().UTC().Truncate(24 * time.Hour)
+			opts.FixturesFrom = today.AddDate(0, 0, -1)
+			opts.FixturesTo = today.AddDate(0, 0, cfg.FootballDataOrg.DaysAhead)
+		}
 
 		logger.Info("import starting", loggedmodule.Attr(loggedmodule.Import),
 			"database", cfg.Database.Describe(), "seasons", seasons, "leagues", importFlags.leagues)
-		summary, err := services.NewImportService(pool, source, eng, logger).Run(ctx, services.ImportOptions{
-			Leagues: importFlags.leagues,
-			Seasons: seasons,
-		})
+		summary, err := svc.Run(ctx, opts)
 		if summary != nil {
 			logger.Info("import finished", loggedmodule.Attr(loggedmodule.Import), "run_id", summary.RunID, "ok", err == nil)
 		}
@@ -78,5 +104,6 @@ func init() {
 	importCmd.Flags().StringSliceVar(&importFlags.leagues, "league", nil, "league id(s) to import, e.g. epl,laliga (default: all)")
 	importCmd.Flags().StringSliceVar(&importFlags.seasons, "season", nil, "season code(s), e.g. 2526,2627 (default: previous and current)")
 	importCmd.Flags().StringVar(&importFlags.fromDir, "from-dir", "", "read <dir>/<season>/<division>.csv instead of downloading")
+	importCmd.Flags().BoolVar(&importFlags.noFixtures, "no-fixtures", false, "import results only, without upcoming fixtures")
 	rootCmd.AddCommand(importCmd)
 }

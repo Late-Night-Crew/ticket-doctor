@@ -9,8 +9,8 @@ Sources:
 ## 1. How it fits together
 
 ```
-football-data.co.uk CSVs ──┐
-(fixtures source, see D4) ─┤
+football-data.co.uk CSVs ──┐  results + odds
+football-data.org API ─────┤  upcoming fixtures (D4)
                            ▼
            ticketdoctor import   (GitHub Actions, daily cron)
            1. upsert matches (results + upcoming fixtures)
@@ -77,6 +77,7 @@ Based on SRS 5; additions are marked **(+)**.
 | 03 | create_matches | `matches(id, league_id, kickoff timestamptz, home_team_id, away_team_id, home_goals, away_goals, status, odds_home/draw/away)` + **(+)** unique (league_id, kickoff::date, home, away) for idempotent imports |
 | 04 | create_team_profiles | SRS fields, pk (team_id, venue, window_n) |
 | 05 | create_import_runs **(+)** | Moved up: done in B2 |
+| 06 | add_fixtures_source **(+)** | `leagues.fdo_code` (PL, PD, BL1) and match status `postponed` (B2) |
 | 06 | create_analysed_legs (B3) | SRS fields + **(+)** `outcome` (won/lost/pending, FR-7.2) |
 | 07 | create_suggestions (B3) | SRS fields (`accepted`, `outcome`) |
 
@@ -102,7 +103,7 @@ Each milestone ends with green CI and a pull request.
   - **Settle:** settles all 15 markets (needed for B4). A test checks that `Contradicts` is exactly "no score from 0-0 to 9-9 lets both win", which proves addendum A2 has no gaps.
   - **Also included:** profile building from results with the window and form string (FR-2), and a `rules:` section in config (NFR-6) that is validated at startup.
 
-**B2 Data (SRS M1): results import done 2026-11-26; fixtures waiting on D4**
+**B2 Data (SRS M1): done 2026-11-27**
 - Migrations 01–07, `query.sql` + sqlc.
 - `pkg/footballdata`: `mmz4281/{season}/{E0|SP1|D1}.csv`, covering the current and previous season so early-season windows still have 10 matches.
 - `pkg/teamnames` + aliases (FR-1.5).
@@ -118,7 +119,13 @@ Each milestone ends with green CI and a pull request.
   - **`ticketdoctor import`:** each league is imported in its own transaction, recorded in `import_runs`, and safe to re-run.
   - **First live import into the local database:** 1,395 matches, 67 teams, 134 profiles in about 5 s; a second run changed nothing.
   - **Tests:** integration tests on a real Postgres (CI service container) and a migrations round trip, down to zero and back up.
-- **Still to do in B2: upcoming fixtures (FR-1.2), waiting on D4.** football-data.co.uk's `fixtures.csv` only covers the next few days, and on 26 Nov it had no Premier League, La Liga or Bundesliga games at all, so it can't support "this weekend" reliably.
+- **Fixtures (FR-1.2), added 2026-11-27:** `pkg/footballdataorg` reads football-data.org (one request per league), from yesterday to `days_ahead` (14) days ahead.
+  - Fixtures are saved in the same transaction as the league's results, after them, and **never overwrite a finished match**.
+  - Postponed, suspended and cancelled games get status `postponed` (migration 06) and keep their row, so a new date updates it.
+  - **Fixtures never create teams.** A club name that matches nothing is skipped and reported, and the run is marked failed, so a missing alias can't create a duplicate club.
+  - A fixtures download failure still saves the results, and also marks the run failed.
+  - **Live:** all 58 clubs football-data.org lists matched by name with no new aliases; 73 fixtures (30 EPL, 24 La Liga, 19 Bundesliga) imported, and a second run changed nothing.
+  - For B3: fixture lists show `status = 'scheduled'` and kick-off in the future.
 
 **B3 API**
 - Leagues and fixtures, analyse, accept, wizard, results (§3), with handler tests using `httptest`.
@@ -151,7 +158,7 @@ Each milestone ends with green CI and a pull request.
 | D1 | ~~Fiber v2 or v3?~~ | **Decided 2026-11-26: v3** |
 | D2 | ~~Database host~~ | **Decided 2026-11-26: Supabase** (Postgres). The daily import keeps the free tier from pausing; the API connects with the connection string in `TD_DATABASE_URL` |
 | D3 | ~~Module name~~ | **`ticketdoctor`** (used in B0) |
-| D4 | **Fixtures source (FR-1.2).** Checked 26 Nov: football-data.co.uk's `fixtures.csv` covers only a few days ahead and had none of our leagues. football-data.org's free tier covers the Premier League, La Liga and Bundesliga (10 requests a minute) with a free API key | **football-data.org.** Needs a free account to get the key, which goes in `TD_FOOTBALL_DATA_ORG_TOKEN` (never committed). Its club names map onto ours through `pkg/teamnames` |
+| D4 | ~~Fixtures source (FR-1.2)~~ | **Decided 2026-11-27: football-data.org** (free tier, 10 requests a minute). The key goes in `TD_FOOTBALL_DATA_ORG_TOKEN`, or `football_data_org.token` in the untracked `config.yaml`; for B5 it becomes a repository secret for the import cron |
 | D5 | **Admin auth (open question 6)** | Reuse the nsms JWT login with admin users created from config; decide before B6 |
 
 Still open from the frontend plan and relevant here: **3** (double chance 12), **4** (weekend timezone), **10** (like-for-like results). Settle them before B3 and B4.

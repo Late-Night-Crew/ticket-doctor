@@ -53,11 +53,12 @@ func TestFileOverridesDefaultsAndKeepsTheRest(t *testing.T) {
 func TestEnvironmentOverrides(t *testing.T) {
 	cfg := Defaults()
 	err := cfg.ApplyEnvironment(env(map[string]string{
-		"TD_ENVIRONMENT":     "production",
-		"TD_DATABASE_URL":    "postgres://u:p@db/td",
-		"PORT":               "10000",
-		"TD_ALLOWED_ORIGINS": "https://ticketdoctor.app, https://preview.ticketdoctor.app",
-		"TD_TRUSTED_PROXIES": "10.0.0.0/8",
+		"TD_ENVIRONMENT":             "production",
+		"TD_DATABASE_URL":            "postgres://u:p@db/td",
+		"PORT":                       "10000",
+		"TD_ALLOWED_ORIGINS":         "https://ticketdoctor.app, https://preview.ticketdoctor.app",
+		"TD_TRUSTED_PROXIES":         "10.0.0.0/8",
+		"TD_FOOTBALL_DATA_ORG_TOKEN": "abc123",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -68,8 +69,21 @@ func TestEnvironmentOverrides(t *testing.T) {
 	if len(cfg.Server.AllowedOrigins) != 2 || cfg.Server.AllowedOrigins[1] != "https://preview.ticketdoctor.app" {
 		t.Fatalf("origins not split: %q", cfg.Server.AllowedOrigins)
 	}
+	if cfg.FootballDataOrg.Token != "abc123" || cfg.FootballDataOrg.DaysAhead != 14 {
+		t.Fatalf("fixtures config = %+v, want the token and 14 days", cfg.FootballDataOrg)
+	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("valid production config rejected: %v", err)
+	}
+}
+
+func TestFixturesDaysAheadValidated(t *testing.T) {
+	for _, days := range []int{0, 32} {
+		cfg := Defaults()
+		cfg.FootballDataOrg.DaysAhead = days
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "days_ahead") {
+			t.Errorf("days_ahead %d: err = %v", days, err)
+		}
 	}
 }
 

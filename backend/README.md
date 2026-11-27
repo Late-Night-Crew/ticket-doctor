@@ -2,7 +2,7 @@
 
 Go API for Ticket Doctor. It has the same layout as the Late Night Crew School Management System backend (and parrot), so it should feel familiar. The plan is in [../Docs/BACKEND_PLAN.md](../Docs/BACKEND_PLAN.md).
 
-> Status: **B0, B1 and B2 (results) done.** CLI (`server`, `migrate`, `import`), rules engine, database schema, results import and team profiles. Upcoming fixtures and the ticket endpoints are next (see the plan).
+> Status: **B0, B1 and B2 done.** CLI (`server`, `migrate`, `import`), rules engine, database schema, results and fixtures import, and team profiles. The ticket endpoints (B3) are next (see the plan).
 
 ## Run it
 
@@ -13,12 +13,14 @@ cd backend
 psql -U postgres -h localhost -c "CREATE DATABASE ticketdoctor"   # once
 cp config.example.yaml config.yaml                                  # once; fill in the password
 task migrate      # apply migrations
-task import       # download results for the 3 leagues, rebuild team profiles (~5 s)
+task import       # results and upcoming fixtures for the 3 leagues, rebuild team profiles (~5 s)
 task dev          # API on http://127.0.0.1:8080, try /api/health
 task check        # everything CI runs
 ```
 
-`task import -- --league epl --season 2627` imports one league or season; `--from-dir` reads CSVs from disk instead of downloading. Re-running is safe: unchanged matches are left alone, and every run is recorded in `import_runs`.
+Fixtures need a free football-data.org API key in `football_data_org.token` (your `config.yaml`) or `TD_FOOTBALL_DATA_ORG_TOKEN`; without one, a development import loads results only.
+
+`task import -- --league epl --season 2627` imports one league or season; `--from-dir` reads CSVs from disk instead of downloading; `--no-fixtures` skips fixtures. Re-running is safe: unchanged matches are left alone, and every run is recorded in `import_runs`.
 
 ### Database tests
 
@@ -47,7 +49,8 @@ Never point it at your development database: the tests empty the tables.
 | `schema/` | Request and response structs; must match `frontend/src/api/types.ts` | same |
 | `engine/` | **New.** Pure rules engine (profiles, estimates, bands, swaps, wizard), no DB or HTTP | grading and promotion rules, kept separate |
 | `pkg/problemdetail/` | RFC 7807 errors | same (one copy only) |
-| `pkg/footballdata/` | football-data.co.uk CSV client and parser | like parrot's `pkg/<provider>` |
+| `pkg/footballdata/` | football-data.co.uk CSV client and parser (results, odds) | like parrot's `pkg/<provider>` |
+| `pkg/footballdataorg/` | football-data.org API client (upcoming fixtures) | like parrot's `pkg/<provider>` |
 | `pkg/teamnames/` | Club name normalisation across sources | new |
 | `common/` | Request parsing and validation, SQL and HTTP helpers | same |
 | `logging/` | Logger and module names | same |

@@ -90,7 +90,7 @@ func (q *Queries) FinishImportRun(ctx context.Context, arg FinishImportRunParams
 }
 
 const getLeague = `-- name: GetLeague :one
-SELECT id, name, country, source, fd_code, created_at FROM leagues WHERE id = $1
+SELECT id, name, country, source, fd_code, created_at, fdo_code FROM leagues WHERE id = $1
 `
 
 func (q *Queries) GetLeague(ctx context.Context, id string) (League, error) {
@@ -103,6 +103,7 @@ func (q *Queries) GetLeague(ctx context.Context, id string) (League, error) {
 		&i.Source,
 		&i.FdCode,
 		&i.CreatedAt,
+		&i.FdoCode,
 	)
 	return i, err
 }
@@ -179,7 +180,7 @@ func (q *Queries) ListFinishedMatchesByLeague(ctx context.Context, leagueID stri
 const listLeagues = `-- name: ListLeagues :many
 
 
-SELECT id, name, country, source, fd_code, created_at FROM leagues ORDER BY name
+SELECT id, name, country, source, fd_code, created_at, fdo_code FROM leagues ORDER BY name
 `
 
 // Queries for sqlc (see sqlc.yaml). Each "-- name:" becomes a Go method on
@@ -201,6 +202,7 @@ func (q *Queries) ListLeagues(ctx context.Context) ([]League, error) {
 			&i.Source,
 			&i.FdCode,
 			&i.CreatedAt,
+			&i.FdoCode,
 		); err != nil {
 			return nil, err
 		}
@@ -342,6 +344,52 @@ type UpdateTeamFormParams struct {
 func (q *Queries) UpdateTeamForm(ctx context.Context, arg UpdateTeamFormParams) error {
 	_, err := q.db.Exec(ctx, updateTeamForm, arg.ID, arg.Form)
 	return err
+}
+
+const upsertFixture = `-- name: UpsertFixture :one
+INSERT INTO matches (league_id, season, kickoff, home_team_id, away_team_id, status, source)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (league_id, season, home_team_id, away_team_id) DO UPDATE
+SET kickoff    = EXCLUDED.kickoff,
+    status     = EXCLUDED.status,
+    source     = EXCLUDED.source,
+    updated_at = now()
+WHERE matches.status <> 'finished'
+  AND (matches.kickoff, matches.status) IS DISTINCT FROM (EXCLUDED.kickoff, EXCLUDED.status)
+RETURNING id, (xmax = 0)::boolean AS inserted
+`
+
+type UpsertFixtureParams struct {
+	LeagueID   string
+	Season     string
+	Kickoff    time.Time
+	HomeTeamID int64
+	AwayTeamID int64
+	Status     string
+	Source     string
+}
+
+type UpsertFixtureRow struct {
+	ID       int64
+	Inserted bool
+}
+
+// Inserts an upcoming fixture, or updates its kick-off or status. A finished
+// match is never touched: its result comes from the results import. Returns
+// whether a row was inserted; returns no row at all when nothing changed.
+func (q *Queries) UpsertFixture(ctx context.Context, arg UpsertFixtureParams) (UpsertFixtureRow, error) {
+	row := q.db.QueryRow(ctx, upsertFixture,
+		arg.LeagueID,
+		arg.Season,
+		arg.Kickoff,
+		arg.HomeTeamID,
+		arg.AwayTeamID,
+		arg.Status,
+		arg.Source,
+	)
+	var i UpsertFixtureRow
+	err := row.Scan(&i.ID, &i.Inserted)
+	return i, err
 }
 
 const upsertMatch = `-- name: UpsertMatch :one

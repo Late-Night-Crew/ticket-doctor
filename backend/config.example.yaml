@@ -56,3 +56,11 @@ rules:
   max_suggestions: 2         # swaps offered per leg
   value_margin: 0.05         # "value" when the estimate beats implied odds by 5 points (4.5)
   bold_floor: 0.35           # the wizard never picks below 35% (4.6)
+
+# Upcoming fixtures from football-data.org (decision D4, FR-1.2). Get a free API
+# key at football-data.org. It's a secret: put it in your own config.yaml (not
+# committed) or the TD_FOOTBALL_DATA_ORG_TOKEN environment variable, never here.
+# Without a key, development imports results only and PRODUCTION refuses to run.
+football_data_org:
+  token: ""
+  days_ahead: 14             # covers today, this weekend and next weekend (1-31)
