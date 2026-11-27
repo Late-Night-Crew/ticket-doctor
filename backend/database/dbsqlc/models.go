@@ -70,6 +70,28 @@ type ResultEntry struct {
 	CreatedAt    time.Time
 }
 
+type SavedTicket struct {
+	ID        string
+	TicketID  string
+	Origin    string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	SettledAt *time.Time
+}
+
+type SavedTicketLeg struct {
+	ID               int64
+	SavedTicketID    string
+	MatchID          int64
+	OriginalMarket   string
+	OriginalOdds     *float64
+	OriginalEstimate float64
+	OriginalBand     string
+	FinalMarket      string
+	Suggestions      []byte
+	Position         int32
+}
+
 type Suggestion struct {
 	ID            int64
 	AnalysedLegID int64

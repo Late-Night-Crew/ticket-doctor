@@ -96,7 +96,17 @@ This is the daily job (run by GitHub Actions, not by the server).`,
 		if summary != nil {
 			logger.Info("import finished", loggedmodule.Attr(loggedmodule.Import), "run_id", summary.RunID, "ok", err == nil)
 		}
-		return err
+
+		// Saved tickets (V2): mark the ones whose games have all been played,
+		// and delete those settled more than 90 days ago. Runs even if the
+		// import partly failed: it only reads results already stored.
+		settled, deleted, cerr := services.NewSavedService(pool, time.Now).Cleanup(ctx)
+		if cerr != nil {
+			logger.Error("saved ticket clean-up failed", loggedmodule.Attr(loggedmodule.Import), "error", cerr)
+		} else {
+			logger.Info("saved tickets cleaned up", loggedmodule.Attr(loggedmodule.Import), "settled", settled, "deleted", deleted)
+		}
+		return errors.Join(err, cerr)
 	},
 }
 

@@ -265,6 +265,26 @@ func (q *Queries) DashboardCounts(ctx context.Context, now time.Time) (Dashboard
 	return i, err
 }
 
+const deleteExpiredSaved = `-- name: DeleteExpiredSaved :execrows
+DELETE FROM saved_tickets
+WHERE settled_at < $1::timestamptz OR created_at < $2::timestamptz
+`
+
+type DeleteExpiredSavedParams struct {
+	SettledBefore time.Time
+	CreatedBefore time.Time
+}
+
+// Settled tickets go after the keep period; tickets that never settle (a
+// game cancelled for good) go after a longer one.
+func (q *Queries) DeleteExpiredSaved(ctx context.Context, arg DeleteExpiredSavedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredSaved, arg.SettledBefore, arg.CreatedBefore)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteLegSuggestions = `-- name: DeleteLegSuggestions :exec
 DELETE FROM suggestions WHERE analysed_leg_id = $1
 `
@@ -272,6 +292,33 @@ DELETE FROM suggestions WHERE analysed_leg_id = $1
 // The user changed their own pick: suggestions for the old pick no longer apply.
 func (q *Queries) DeleteLegSuggestions(ctx context.Context, analysedLegID int64) error {
 	_, err := q.db.Exec(ctx, deleteLegSuggestions, analysedLegID)
+	return err
+}
+
+const deleteSaved = `-- name: DeleteSaved :execrows
+DELETE FROM saved_tickets WHERE id = $1 AND ticket_id = $2
+`
+
+type DeleteSavedParams struct {
+	ID       string
+	TicketID string
+}
+
+// Only with the ticket's own id, which only the saving browser has.
+func (q *Queries) DeleteSaved(ctx context.Context, arg DeleteSavedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSaved, arg.ID, arg.TicketID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSavedLegs = `-- name: DeleteSavedLegs :exec
+DELETE FROM saved_ticket_legs WHERE saved_ticket_id = $1
+`
+
+func (q *Queries) DeleteSavedLegs(ctx context.Context, savedTicketID string) error {
+	_, err := q.db.Exec(ctx, deleteSavedLegs, savedTicketID)
 	return err
 }
 
@@ -399,6 +446,26 @@ func (q *Queries) GetMatchesByIDs(ctx context.Context, ids []int64) ([]GetMatche
 	return items, nil
 }
 
+const getSavedByTicket = `-- name: GetSavedByTicket :one
+
+SELECT id, ticket_id, origin, created_at, updated_at, settled_at FROM saved_tickets WHERE ticket_id = $1
+`
+
+// ---------- saved tickets (V2, FR-9) ----------
+func (q *Queries) GetSavedByTicket(ctx context.Context, ticketID string) (SavedTicket, error) {
+	row := q.db.QueryRow(ctx, getSavedByTicket, ticketID)
+	var i SavedTicket
+	err := row.Scan(
+		&i.ID,
+		&i.TicketID,
+		&i.Origin,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SettledAt,
+	)
+	return i, err
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, username, password_hash, role, password_changed_at, disabled, last_login_at, created_at FROM users WHERE id = $1
 `
@@ -462,6 +529,21 @@ func (q *Queries) InsertResultEntry(ctx context.Context, arg InsertResultEntryPa
 		arg.PreviousHome,
 		arg.PreviousAway,
 	)
+	return err
+}
+
+const insertSaved = `-- name: InsertSaved :exec
+INSERT INTO saved_tickets (id, ticket_id, origin) VALUES ($1, $2, $3)
+`
+
+type InsertSavedParams struct {
+	ID       string
+	TicketID string
+	Origin   string
+}
+
+func (q *Queries) InsertSaved(ctx context.Context, arg InsertSavedParams) error {
+	_, err := q.db.Exec(ctx, insertSaved, arg.ID, arg.TicketID, arg.Origin)
 	return err
 }
 
@@ -929,6 +1011,116 @@ func (q *Queries) ListProfilesForTeams(ctx context.Context, arg ListProfilesForT
 	return items, nil
 }
 
+const listSaved = `-- name: ListSaved :many
+SELECT id, ticket_id, origin, created_at, updated_at, settled_at FROM saved_tickets WHERE id = ANY ($1::text[])
+`
+
+func (q *Queries) ListSaved(ctx context.Context, ids []string) ([]SavedTicket, error) {
+	rows, err := q.db.Query(ctx, listSaved, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SavedTicket{}
+	for rows.Next() {
+		var i SavedTicket
+		if err := rows.Scan(
+			&i.ID,
+			&i.TicketID,
+			&i.Origin,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.SettledAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSavedLegs = `-- name: ListSavedLegs :many
+SELECT l.saved_ticket_id, l.position, l.original_market, l.original_odds, l.original_estimate, l.original_band,
+       l.final_market, l.suggestions,
+       m.id AS match_id, m.league_id, m.kickoff, m.status, m.home_goals, m.away_goals,
+       h.id AS home_id, h.name AS home_name, h.form AS home_form,
+       a.id AS away_id, a.name AS away_name, a.form AS away_form
+FROM saved_ticket_legs l
+JOIN matches m ON m.id = l.match_id
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE l.saved_ticket_id = ANY ($1::text[])
+ORDER BY l.saved_ticket_id, l.position
+`
+
+type ListSavedLegsRow struct {
+	SavedTicketID    string
+	Position         int32
+	OriginalMarket   string
+	OriginalOdds     *float64
+	OriginalEstimate float64
+	OriginalBand     string
+	FinalMarket      string
+	Suggestions      []byte
+	MatchID          int64
+	LeagueID         string
+	Kickoff          time.Time
+	Status           string
+	HomeGoals        *int16
+	AwayGoals        *int16
+	HomeID           int64
+	HomeName         string
+	HomeForm         string
+	AwayID           int64
+	AwayName         string
+	AwayForm         string
+}
+
+// Legs of the given saved tickets with their match, teams and score.
+func (q *Queries) ListSavedLegs(ctx context.Context, ids []string) ([]ListSavedLegsRow, error) {
+	rows, err := q.db.Query(ctx, listSavedLegs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSavedLegsRow{}
+	for rows.Next() {
+		var i ListSavedLegsRow
+		if err := rows.Scan(
+			&i.SavedTicketID,
+			&i.Position,
+			&i.OriginalMarket,
+			&i.OriginalOdds,
+			&i.OriginalEstimate,
+			&i.OriginalBand,
+			&i.FinalMarket,
+			&i.Suggestions,
+			&i.MatchID,
+			&i.LeagueID,
+			&i.Kickoff,
+			&i.Status,
+			&i.HomeGoals,
+			&i.AwayGoals,
+			&i.HomeID,
+			&i.HomeName,
+			&i.HomeForm,
+			&i.AwayID,
+			&i.AwayName,
+			&i.AwayForm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeamsByLeague = `-- name: ListTeamsByLeague :many
 
 SELECT id, league_id, name, name_key, aliases, form, created_at FROM teams WHERE league_id = $1 ORDER BY name
@@ -1045,12 +1237,42 @@ func (q *Queries) LockUsers(ctx context.Context) error {
 	return err
 }
 
+const markSavedSettled = `-- name: MarkSavedSettled :execrows
+UPDATE saved_tickets t SET settled_at = now()
+WHERE settled_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM saved_ticket_legs l JOIN matches m ON m.id = l.match_id
+                  WHERE l.saved_ticket_id = t.id AND m.status <> 'finished')
+`
+
+func (q *Queries) MarkSavedSettled(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, markSavedSettled)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const recordLogin = `-- name: RecordLogin :exec
 UPDATE users SET last_login_at = now() WHERE id = $1
 `
 
 func (q *Queries) RecordLogin(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, recordLogin, id)
+	return err
+}
+
+const resaveSaved = `-- name: ResaveSaved :exec
+UPDATE saved_tickets SET origin = $2, updated_at = now(), settled_at = NULL WHERE id = $1
+`
+
+type ResaveSavedParams struct {
+	ID     string
+	Origin string
+}
+
+// Saving again replaces the snapshot; it may no longer be settled.
+func (q *Queries) ResaveSaved(ctx context.Context, arg ResaveSavedParams) error {
+	_, err := q.db.Exec(ctx, resaveSaved, arg.ID, arg.Origin)
 	return err
 }
 
@@ -1099,6 +1321,34 @@ type SetUserPasswordParams struct {
 
 func (q *Queries) SetUserPassword(ctx context.Context, arg SetUserPasswordParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setUserPassword, arg.Username, arg.PasswordHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const snapshotLegs = `-- name: SnapshotLegs :execrows
+INSERT INTO saved_ticket_legs (saved_ticket_id, match_id, original_market, original_odds, original_estimate,
+                               original_band, final_market, suggestions, position)
+SELECT $1::text, l.match_id, l.original_market, l.original_odds, l.original_estimate,
+       l.original_band, l.final_market,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('market', s.market, 'estimate', s.estimate,
+                                                     'risk_band', s.risk_band, 'accepted', s.accepted)
+                                  ORDER BY s.estimate DESC)
+                 FROM suggestions s WHERE s.analysed_leg_id = l.id), '[]'::jsonb),
+       row_number() OVER (ORDER BY l.id)::int
+FROM analysed_legs l
+WHERE l.ticket_id = $2::text AND l.on_ticket
+`
+
+type SnapshotLegsParams struct {
+	SavedID  string
+	TicketID string
+}
+
+// Copies the ticket's current legs and the suggestions shown for them.
+func (q *Queries) SnapshotLegs(ctx context.Context, arg SnapshotLegsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, snapshotLegs, arg.SavedID, arg.TicketID)
 	if err != nil {
 		return 0, err
 	}

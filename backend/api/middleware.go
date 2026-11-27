@@ -22,7 +22,7 @@ func (a *API) middleware() {
 	// Only the frontend origins in config may call the API from a browser.
 	a.app.Use(cors.New(cors.Config{
 		AllowOrigins: a.cfg.Server.AllowedOrigins,
-		AllowMethods: []string{fiber.MethodGet, fiber.MethodPost, fiber.MethodPut, fiber.MethodOptions},
+		AllowMethods: []string{fiber.MethodGet, fiber.MethodPost, fiber.MethodPut, fiber.MethodDelete, fiber.MethodOptions},
 		AllowHeaders: []string{fiber.HeaderContentType},
 		MaxAge:       600,
 	}))

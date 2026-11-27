@@ -310,3 +310,65 @@ SELECT count(*) FROM users;
 -- name: LockUsers :exec
 -- Serialises first-admin setup, so two people can't both create "the first" account.
 LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE;
+
+-- ---------- saved tickets (V2, FR-9) ----------
+
+-- name: GetSavedByTicket :one
+SELECT * FROM saved_tickets WHERE ticket_id = $1;
+
+-- name: InsertSaved :exec
+INSERT INTO saved_tickets (id, ticket_id, origin) VALUES ($1, $2, $3);
+
+-- name: ResaveSaved :exec
+-- Saving again replaces the snapshot; it may no longer be settled.
+UPDATE saved_tickets SET origin = $2, updated_at = now(), settled_at = NULL WHERE id = $1;
+
+-- name: DeleteSavedLegs :exec
+DELETE FROM saved_ticket_legs WHERE saved_ticket_id = $1;
+
+-- name: SnapshotLegs :execrows
+-- Copies the ticket's current legs and the suggestions shown for them.
+INSERT INTO saved_ticket_legs (saved_ticket_id, match_id, original_market, original_odds, original_estimate,
+                               original_band, final_market, suggestions, position)
+SELECT sqlc.arg(saved_id)::text, l.match_id, l.original_market, l.original_odds, l.original_estimate,
+       l.original_band, l.final_market,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('market', s.market, 'estimate', s.estimate,
+                                                     'risk_band', s.risk_band, 'accepted', s.accepted)
+                                  ORDER BY s.estimate DESC)
+                 FROM suggestions s WHERE s.analysed_leg_id = l.id), '[]'::jsonb),
+       row_number() OVER (ORDER BY l.id)::int
+FROM analysed_legs l
+WHERE l.ticket_id = sqlc.arg(ticket_id)::text AND l.on_ticket;
+
+-- name: ListSaved :many
+SELECT * FROM saved_tickets WHERE id = ANY (sqlc.arg(ids)::text[]);
+
+-- name: ListSavedLegs :many
+-- Legs of the given saved tickets with their match, teams and score.
+SELECT l.saved_ticket_id, l.position, l.original_market, l.original_odds, l.original_estimate, l.original_band,
+       l.final_market, l.suggestions,
+       m.id AS match_id, m.league_id, m.kickoff, m.status, m.home_goals, m.away_goals,
+       h.id AS home_id, h.name AS home_name, h.form AS home_form,
+       a.id AS away_id, a.name AS away_name, a.form AS away_form
+FROM saved_ticket_legs l
+JOIN matches m ON m.id = l.match_id
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE l.saved_ticket_id = ANY (sqlc.arg(ids)::text[])
+ORDER BY l.saved_ticket_id, l.position;
+
+-- name: DeleteSaved :execrows
+-- Only with the ticket's own id, which only the saving browser has.
+DELETE FROM saved_tickets WHERE id = $1 AND ticket_id = $2;
+
+-- name: MarkSavedSettled :execrows
+UPDATE saved_tickets t SET settled_at = now()
+WHERE settled_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM saved_ticket_legs l JOIN matches m ON m.id = l.match_id
+                  WHERE l.saved_ticket_id = t.id AND m.status <> 'finished');
+
+-- name: DeleteExpiredSaved :execrows
+-- Settled tickets go after the keep period; tickets that never settle (a
+-- game cancelled for good) go after a longer one.
+DELETE FROM saved_tickets
+WHERE settled_at < sqlc.arg(settled_before)::timestamptz OR created_at < sqlc.arg(created_before)::timestamptz;
