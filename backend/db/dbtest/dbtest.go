@@ -67,7 +67,7 @@ func New(t *testing.T) *pgxpool.Pool {
 	if _, err := db.Migrate(ctx, sqlDB); err != nil {
 		t.Fatalf("migrate test database: %v", err)
 	}
-	if _, err := pool.Exec(ctx, `TRUNCATE team_profiles, matches, teams, import_runs RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := pool.Exec(ctx, `TRUNCATE suggestions, analysed_legs, team_profiles, matches, teams, import_runs RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("empty test database: %v", err)
 	}
 	return pool

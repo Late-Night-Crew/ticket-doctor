@@ -159,19 +159,19 @@ On Slow 3G about 4 s is network round-trip latency (2 s per round trip in the De
 
 ## Agreed SRS additions
 
-Items 1, 2, 11 and 12 were confirmed on 2026-11-26. Items 3, 4 and 6 to 10 are still open.
+Items 1, 2, 11 and 12 were confirmed on 2026-11-26; items 3, 4 and 10 were decided on 2026-11-27. Items 6 to 9 are still open.
 
 
 1. **Derived markets.** The SRS has no rule for BTTS no, Under 1.5, Under 2.5 or Over 3.5, and profiles only store the over 1.5, over 2.5 and under 3.5 rates. The mock uses complements: BTTS no = 1 − BTTS yes, Under 1.5 = 1 − Over 1.5, Under 2.5 = 1 − Over 2.5, Over 3.5 = 1 − Under 3.5.
 2. **Swaps must not contradict the pick.** For a High-risk away win at 25%, the rule in 4.3 would also suggest Double chance 1X at 75%, which is a bet *against* the user's pick. The worked example in 4.4 does not suggest it, so the mock excludes markets that can never win together with the original pick, such as 1X vs away win or over 2.5 vs under 2.5.
-3. **Double chance 12** (home or away) is not supported. Either define it as 1 − the draw estimate, or leave it out.
-4. **"This weekend"** is currently the coming Saturday and Sunday in the user's local time.
+3. ~~**Double chance 12**~~ **Decided 2026-11-27: not in the MVP**, possibly later as a low-pay option. See SRS addendum C.
+4. ~~**"This weekend"**~~ **Decided 2026-11-27: Central Africa Time**, decided by the server. See SRS addendum A5.
 5. ~~Wizard ticket sizes~~: replaced by agreed addition 11 (exact number of games).
 6. **Admin access** is not specified. A shared secret on the API is suggested for the MVP.
 7. **Analysis runs on an explicit "Analyse" tap**, not on every edit, to stay within the free-tier limits.
 8. **Help links in the footer** are UK-based (BeGambleAware, GamCare, Gamblers Anonymous). Add Malawi-specific resources if there are any.
 9. **When for beginners.** FR-8.3 says the beginner path asks only risk and focus, so the wizard uses this weekend. Should it use today when today has enough matches?
-10. **Fair swap comparison (backend).** FR-7.3 compares all original picks with all suggestions, but swaps exist only for Medium and High legs, which flatters the swaps. Suggest `/api/results` also returns, per row, the hit rate of the *original picks that received a suggestion*, so the page can compare like with like.
+10. ~~**Fair swap comparison (backend).**~~ **Decided 2026-11-27: yes**, together with counting each match once per ticket. See SRS addendum A6. FR-7.3 compares all original picks with all suggestions, but swaps exist only for Medium and High legs, which flatters the swaps. Suggest `/api/results` also returns, per row, the hit rate of the *original picks that received a suggestion*, so the page can compare like with like.
 11. **Number of games in the wizard (amends FR-8.2 and FR-8.3).** Agreed 2026-11-26: the user picks an exact number of games, 2–10 on the guided path and 2–4 on the beginner path. Risk level and number of games are separate choices. If fewer games qualify, the ticket is shorter and says why (4.6.6).
 12. **Risk level picks the band, not just the limit (amends 4.6 rules 3 and 5).** As written, 4.6 takes the highest-estimate pick per match and fills by estimate, so Bold tickets came out the same as Safe whenever enough Low legs existed. Agreed 2026-11-26 (from the request for "high risk, high reward with only 2 games"):
     - **Safe:** all Low legs.

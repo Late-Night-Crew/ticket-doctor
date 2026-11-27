@@ -78,8 +78,7 @@ Based on SRS 5; additions are marked **(+)**.
 | 04 | create_team_profiles | SRS fields, pk (team_id, venue, window_n) |
 | 05 | create_import_runs **(+)** | Moved up: done in B2 |
 | 06 | add_fixtures_source **(+)** | `leagues.fdo_code` (PL, PD, BL1) and match status `postponed` (B2) |
-| 06 | create_analysed_legs (B3) | SRS fields + **(+)** `outcome` (won/lost/pending, FR-7.2) |
-| 07 | create_suggestions (B3) | SRS fields (`accepted`, `outcome`) |
+| 07 | create_ticket_log (B3) | `analysed_legs` (one row per ticket and match: user's pick, final pick, `on_ticket`) and `suggestions` (`accepted`). No stored outcome: it's worked out from the score when results are read (addendum A6) |
 
 Market values are stored as the same keys as the frontend (`HOME_WIN`, `OVER_2_5`…), with a CHECK constraint.
 
@@ -127,13 +126,29 @@ Each milestone ends with green CI and a pull request.
   - **Live:** all 58 clubs football-data.org lists matched by name with no new aliases; 73 fixtures (30 EPL, 24 La Liga, 19 Bundesliga) imported, and a second run changed nothing.
   - For B3: fixture lists show `status = 'scheduled'` and kick-off in the future.
 
-**B3 API**
+**B3 API: done 2026-11-27**
 - Leagues and fixtures, analyse, accept, wizard, results (§3), with handler tests using `httptest`.
 - Done when the frontend runs with `VITE_USE_MOCKS=false` against a local API and every screen works; and a 15-leg analysis returns in under 2 s on the local database (NFR-1).
+- **Result:**
+  - **Decisions (2026-11-27):** windows in Central Africa Time (addendum A5); the ticket log counts each match once per ticket and keeps the user's pick apart from accepted swaps, and results show the like-for-like group (A6); double chance 12 deferred (addendum C).
+  - **Services:** `services/fixtures.go`, `tickets.go`, `wizard.go`, `results.go`. Handlers in `api/leagues`, `api/tickets`, `api/wizard`, `api/results`. User errors are 404/422 problem details; POSTs limited to 30 a minute per IP.
+  - **Ticket log rules:**
+    - The same pick again (or back after Undo) changes nothing.
+    - Accepting a suggestion changes only the final pick.
+    - The user choosing another market replaces their pick and drops the old suggestions.
+    - A match taken off the ticket is marked `on_ticket = false` and not counted.
+  - **Refused:** games already kicked off, finished or postponed.
+  - **Results** are settled from the score when read, so a new matchday counts as soon as it's imported. B4 shrinks to checking that against real matchdays.
+  - **Frontend:** results show "Picks we offered a swap for"; `updated_at` can be null; the mock uses CAT days.
+  - **Checked live:**
+    - The real API on the local database, with the production frontend build in headless Chrome: builder, analysis, swap with Undo, and results worked, with no console errors.
+    - A 15-leg analysis took about 30 ms, or 0.6 s on the first request while the database connection opens.
+  - **For B5:** analysis makes about 2 queries per leg. On Supabase the cost is network round trips, so keep the API and database in the same region.
 
 **B4 Settlement and track record (SRS M5)**
-- The import settles finished matches: legs and suggestions are marked won or lost.
-- Results aggregation, including the like-for-like figure if question 10 is agreed.
+- ~~The import settles finished matches~~: B3 settles when results are read, so nothing is stored and a corrected score fixes itself.
+- ~~Results aggregation and the like-for-like figure~~: done in B3.
+- Left: check it against a real matchday, and decide whether to store outcomes later for speed (only if `/api/results` gets slow).
 - Done when, after a matchday is imported, `/api/results` counts change correctly and pending legs stay pending.
 
 **Release process (added 2026-11-26).** Tag-based releases are in place: `v0.1.0` exists, and `release.yml` checks the tagged commit, builds `ghcr.io/late-night-crew/ticket-doctor-api:<tag>` and creates the GitHub Release. See [RELEASING.md](../RELEASING.md). Every migration from B2 on must follow its backward-compatibility rule.
@@ -161,4 +176,4 @@ Each milestone ends with green CI and a pull request.
 | D4 | ~~Fixtures source (FR-1.2)~~ | **Decided 2026-11-27: football-data.org** (free tier, 10 requests a minute). The key goes in `TD_FOOTBALL_DATA_ORG_TOKEN`, or `football_data_org.token` in the untracked `config.yaml`; for B5 it becomes a repository secret for the import cron |
 | D5 | **Admin auth (open question 6)** | Reuse the nsms JWT login with admin users created from config; decide before B6 |
 
-Still open from the frontend plan and relevant here: **3** (double chance 12), **4** (weekend timezone), **10** (like-for-like results). Settle them before B3 and B4.
+Questions 3, 4 and 10 from the frontend plan were decided on 2026-11-27 (SRS addendum C, A5, A6).

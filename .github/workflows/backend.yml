@@ -117,17 +117,25 @@ jobs:
         run: go build -trimpath -ldflags "-X ticketdoctor/cmd.version=${{ github.sha }}" -o ticketdoctor .
 
       # The binary is tiny and the server is quick to start, so prove it really
-      # runs: start it, ask /api/health, stop it. Unit tests can't catch a
-      # broken main or command wiring; this can.
+      # runs: migrate, start it on the CI database, ask /api/health and
+      # /api/leagues (which reads the database), stop it. Unit tests can't catch
+      # a broken main or command wiring; this can.
       - name: Smoke test
+        env:
+          TD_DATABASE_URL: ${{ env.TD_TEST_DATABASE_URL }}
         run: |
+          ./ticketdoctor migrate up
           TD_PORT=8099 ./ticketdoctor server &
           pid=$!
           for i in $(seq 1 20); do
             if curl -fsS http://127.0.0.1:8099/api/health; then
               echo
+              leagues="$(curl -fsS http://127.0.0.1:8099/api/leagues)"
+              echo "$leagues"
               kill -TERM "$pid"
               wait "$pid"
+              # The three MVP leagues come from migration 01.
+              [ "$(echo "$leagues" | grep -o '"id"' | wc -l)" -eq 3 ] || { echo "expected 3 leagues"; exit 1; }
               exit 0
             fi
             sleep 0.5

@@ -9,25 +9,41 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"ticketdoctor/config"
+	"ticketdoctor/engine"
 	"ticketdoctor/pkg/problemdetail"
 )
+
+// Deps are what the data endpoints need. With a nil Pool only /api/health is
+// served (used by tests that don't need a database).
+type Deps struct {
+	Pool   *pgxpool.Pool
+	Engine *engine.Engine
+	// Now is the clock; nil means time.Now. Tests fix it.
+	Now func() time.Time
+}
 
 type API struct {
 	app     *fiber.App
 	cfg     *config.Config
 	logger  *slog.Logger
 	version string
+	deps    Deps
 }
 
 // New builds the app with middleware and routes registered, ready to Start.
-func New(cfg *config.Config, logger *slog.Logger, version string) *API {
+func New(cfg *config.Config, logger *slog.Logger, version string, deps Deps) *API {
+	if deps.Now == nil {
+		deps.Now = time.Now
+	}
 	a := &API{
 		app:     fiber.New(fiberConfig(cfg, logger)),
 		cfg:     cfg,
 		logger:  logger,
 		version: version,
+		deps:    deps,
 	}
 	a.middleware()
 	a.routes()

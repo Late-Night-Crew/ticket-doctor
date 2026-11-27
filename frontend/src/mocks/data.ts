@@ -128,39 +128,46 @@ export function profilesFor(fixture: Fixture): { home: TeamProfile; away: TeamPr
 
 /* ---------- Fixtures ---------- */
 
-function startOfDay(d: Date): Date {
-  const x = new Date(d)
-  x.setHours(0, 0, 0, 0)
-  return x
+/** "Today" and "this weekend" are Central Africa Time days, as on the server (SRS addendum A5). */
+const CAT_ZONE = 'Africa/Blantyre'
+
+/** The CAT calendar date of an instant, as YYYY-MM-DD. */
+export function catDate(d: Date): string {
+  return d.toLocaleDateString('en-CA', { timeZone: CAT_ZONE })
 }
 
-/** Today, plus the coming Saturday and Sunday. */
-function matchDays(now: Date): Date[] {
-  const today = startOfDay(now)
-  const daysToSat = (6 - today.getDay() + 7) % 7 || 7
-  const sat = new Date(today)
-  sat.setDate(today.getDate() + daysToSat)
-  const sun = new Date(sat)
-  sun.setDate(sat.getDate() + 1)
-  return [today, sat, sun]
+function addDays(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Today and this weekend's Saturday and Sunday, as CAT dates (see fixturesIn). */
+function weekendDays(now: Date): { today: string; saturday: string; sunday: string } {
+  const today = catDate(now)
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay() // 0 Sunday … 6 Saturday
+  if (weekday === 0) return { today, saturday: today, sunday: today } // the rest of the weekend is today
+  const saturday = addDays(today, 6 - weekday)
+  return { today, saturday, sunday: addDays(saturday, 1) }
 }
 
 const KICKOFFS = [[19, 30], [20, 0], [14, 0], [16, 30], [17, 30], [21, 0]]
 
 function buildFixtures(now = new Date()): Fixture[] {
-  const days = matchDays(now)
+  const { today, saturday, sunday } = weekendDays(now)
+  const days = [today, saturday, sunday]
   const out: Fixture[] = []
   for (const league of LEAGUES) {
     const teams = TEAMS.filter((t) => t.league_id === league.id)
-    const rnd = seeded(hash(`${league.id}:${startOfDay(now).toDateString()}`))
+    const rnd = seeded(hash(`${league.id}:${today}`))
     const order = [...teams].sort(() => rnd() - 0.5)
     // Two matches today, the rest across the weekend.
     for (let i = 0; i + 1 < order.length; i += 2) {
       const matchNo = i / 2
       const day = matchNo < 2 ? days[0] : days[matchNo % 2 === 0 ? 1 : 2]
       const [hh, mm] = KICKOFFS[matchNo % KICKOFFS.length]
-      const kickoff = new Date(day)
-      kickoff.setHours(hh, mm)
+      // Kick-off times are CAT wall-clock times (UTC+2, no daylight saving).
+      const kickoff = new Date(`${day}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+02:00`)
       const home = order[i]
       const away = order[i + 1]
       out.push({
@@ -182,14 +189,18 @@ export function fixtureById(id: string): Fixture | undefined {
   return FIXTURE_BY_ID.get(id)
 }
 
+/**
+ * Fixtures in a window, by CAT date: today; this weekend's Saturday and Sunday
+ * (on a weekend day, the rest of that weekend); or everything. Unlike the
+ * server, the mock doesn't hide games that have already kicked off today.
+ */
 export function fixturesIn(when: 'today' | 'weekend' | 'upcoming', leagueId?: string, now = new Date()): Fixture[] {
-  const today = startOfDay(now).toDateString()
+  const { today, saturday, sunday } = weekendDays(now)
   return FIXTURES.filter((f) => {
     if (leagueId && f.league_id !== leagueId) return false
     if (when === 'upcoming') return true
-    const d = new Date(f.kickoff)
-    if (when === 'today') return d.toDateString() === today
-    const dow = d.getDay()
-    return d.toDateString() !== today && (dow === 6 || dow === 0)
+    const day = catDate(new Date(f.kickoff))
+    if (when === 'today') return day === today
+    return day >= saturday && day <= sunday
   })
 }

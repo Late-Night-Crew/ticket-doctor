@@ -16,8 +16,10 @@ export function isSmallSample(c: HitCount): boolean {
   return n > 0 && n < RULES.results.smallSample
 }
 
-export function totals(rows: ResultsRow[]): { original: HitCount; suggested: HitCount } {
-  const sum = (key: 'original' | 'suggested') =>
+type CountKey = 'original' | 'suggested' | 'original_with_suggestion'
+
+export function totals(rows: ResultsRow[]): Record<CountKey, HitCount> {
+  const sum = (key: CountKey) =>
     rows.reduce((acc, r) => ({ won: acc.won + r[key].won, lost: acc.lost + r[key].lost }), { won: 0, lost: 0 })
-  return { original: sum('original'), suggested: sum('suggested') }
+  return { original: sum('original'), suggested: sum('suggested'), original_with_suggestion: sum('original_with_suggestion') }
 }

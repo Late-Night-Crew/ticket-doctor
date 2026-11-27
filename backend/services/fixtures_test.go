@@ -35,9 +35,9 @@ var (
 	sat          = time.Date(2026, 11, 28, 15, 0, 0, 0, time.UTC)
 )
 
-// fixture builds an API fixture in 2026/27; names are football-data.org's
+// apiFixture builds an API fixture in 2026/27; names are football-data.org's
 // official spellings, which differ from the results file's.
-func fixture(id int64, home, away, apiStatus string, kickoff time.Time) footballdataorg.Fixture {
+func apiFixture(id int64, home, away, apiStatus string, kickoff time.Time) footballdataorg.Fixture {
 	status := map[string]footballdataorg.Status{
 		"TIMED": footballdataorg.Scheduled, "SCHEDULED": footballdataorg.Scheduled,
 		"POSTPONED": footballdataorg.Postponed, "FINISHED": footballdataorg.Skip,
@@ -50,15 +50,15 @@ func fixture(id int64, home, away, apiStatus string, kickoff time.Time) football
 
 func baseFixtures() []footballdataorg.Fixture {
 	return []footballdataorg.Fixture{
-		fixture(1, "Chelsea FC", "Arsenal FC", "TIMED", sat),
+		apiFixture(1, "Chelsea FC", "Arsenal FC", "TIMED", sat),
 		{ID: 2, Kickoff: sat.Add(2 * time.Hour), Season: "2627", APIStatus: "SCHEDULED", Status: footballdataorg.Scheduled,
 			// The full name needs the alias table; the short name is a fallback.
 			Home: footballdataorg.Team{Name: "Nottingham Forest FC", ShortName: "Nottingham"},
 			Away: footballdataorg.Team{Name: "Everton FC", ShortName: "Everton"}},
 		// Already played and imported as 1-2 from the results file.
-		fixture(3, "Arsenal FC", "Chelsea FC", "TIMED", sat.Add(24*time.Hour)),
-		fixture(4, "Everton FC", "Leeds United FC", "POSTPONED", sat),
-		fixture(5, "Chelsea FC", "Everton FC", "FINISHED", sat),
+		apiFixture(3, "Arsenal FC", "Chelsea FC", "TIMED", sat.Add(24*time.Hour)),
+		apiFixture(4, "Everton FC", "Leeds United FC", "POSTPONED", sat),
+		apiFixture(5, "Chelsea FC", "Everton FC", "FINISHED", sat),
 	}
 }
 
@@ -150,7 +150,7 @@ func TestFixturesRerunAndChanges(t *testing.T) {
 	// Moved kick-off and a new date for the postponed game: both update.
 	changed := baseFixtures()
 	changed[0].Kickoff = sat.Add(-26 * time.Hour)
-	changed[3] = fixture(4, "Everton FC", "Leeds United FC", "TIMED", sat.Add(96*time.Hour))
+	changed[3] = apiFixture(4, "Everton FC", "Leeds United FC", "TIMED", sat.Add(96*time.Hour))
 	sum, err = importWithFixtures(t, pool, &fakeFixtures{fixtures: changed})
 	if err != nil {
 		t.Fatal(err)
@@ -169,8 +169,8 @@ func TestFixturesRerunAndChanges(t *testing.T) {
 func TestFixturesUnmatchedTeamIsReportedNotCreated(t *testing.T) {
 	pool := dbtest.New(t)
 	fixtures := append(baseFixtures(),
-		fixture(6, "Sunderland AFC", "Arsenal FC", "TIMED", sat),
-		fixture(7, "Everton FC", "Sunderland AFC", "TIMED", sat))
+		apiFixture(6, "Sunderland AFC", "Arsenal FC", "TIMED", sat),
+		apiFixture(7, "Everton FC", "Sunderland AFC", "TIMED", sat))
 
 	sum, err := importWithFixtures(t, pool, &fakeFixtures{fixtures: fixtures})
 	if err == nil {
