@@ -20,7 +20,7 @@ The SRS builds the UI in milestone M3, after the data and analyser core. We are 
 | F4 | Ticket wizard (beginner and guided paths) | FR-8, RG-6 | Done |
 | F5 | Results page | FR-7.3, RG-3 | Done |
 | F6 | Performance and accessibility pass, deploy setup | NFR-2, NFR-3 | Done (hosting moved to Render in B5) |
-| F7 | Admin: sign-in, dashboard, manual result entry, threshold view | FR-1.4 (Should) | Backend ready (B6); pages next |
+| F7 | Admin: sign-in, dashboard, manual result entry, threshold view | FR-1.4 (Should) | Done: its own app shell at `/admin`, loaded only by admins |
 
 ## API contract
 

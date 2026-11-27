@@ -1,6 +1,10 @@
 import { COPY } from '../config/copy'
 
 const TITLES: [prefix: string, title: string][] = [
+  ['/admin/login', 'Admin sign-in'],
+  ['/admin/results', 'Enter results · Admin'],
+  ['/admin/thresholds', 'Rule thresholds · Admin'],
+  ['/admin', 'Dashboard · Admin'],
   ['/ticket/analysis', 'Ticket analysis'],
   ['/ticket', COPY.nav.build],
   ['/wizard', COPY.wizard.entryTitle],
