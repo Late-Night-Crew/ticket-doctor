@@ -110,7 +110,7 @@ func TestDataEndpointErrorsAreProblemDetails(t *testing.T) {
 		{"POST", "/api/tickets/analyse", `{"ticket_id":`, 400, "isn't valid JSON"},
 		{"POST", "/api/tickets/analyse", `{"ticket_id":"abcdef12-3456","origin":"manual","legs":[{"match_id":"` + match + `","market":"DC_12"}]}`, 422, `Unknown market "DC_12".`},
 		{"POST", "/api/suggestions/999/accept", "", 404, "Unknown suggestion."},
-		{"POST", "/api/wizard", `{"path":"guided","risk":"safe","focus":"mix","legs":2,"when":"upcoming"}`, 422, "when must be today or weekend."},
+		{"POST", "/api/wizard", `{"path":"guided","risk":"safe","focus":"mix","legs":2,"when":"upcoming"}`, 422, "when must be today, weekend or soonest."},
 		{"GET", "/api/results?market=NOPE", "", 422, "Unknown market"},
 	}
 	for _, c := range cases {
