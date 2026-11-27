@@ -4,11 +4,14 @@
  * the session in an HttpOnly cookie; here it's a flag in memory.
  */
 import { delay, http, HttpResponse } from 'msw'
-import type { Admin, AdminMatch, Dashboard, Threshold } from '../api/admin'
+import type { Admin, AdminAccount, AdminMatch, Dashboard, Threshold } from '../api/admin'
 import { RULES } from '../config/rules'
 
 const API = '*/api/admin'
 export const MOCK_ADMIN = { username: 'admin', password: 'mock password 123' }
+/** With setupOpen(true), /admin/setup takes this code (and no accounts exist). */
+export const MOCK_SETUP_CODE = 'mock setup code 123'
+
 
 const problem = (status: number, detail: string) =>
   HttpResponse.json({ type: 'about:blank', title: 'Error', status, detail }, { status, headers: { 'Content-Type': 'application/problem+json' } })
@@ -25,11 +28,27 @@ function seedMatches(): AdminMatch[] {
 
 let signedIn = false
 let matches = seedMatches()
+let open = false
+let password = MOCK_ADMIN.password
+const seedAccounts = (): AdminAccount[] => [
+  { id: '1', username: MOCK_ADMIN.username, role: 'admin', last_login_at: null, disabled: false, created_at: hoursAgo(72) },
+  { id: '2', username: 'grace', role: 'admin', last_login_at: hoursAgo(30), disabled: false, created_at: hoursAgo(48) },
+]
+let accounts = seedAccounts()
 
-/** Back to signed out with the original games (tests call this between cases). */
+/** Back to signed out with the original games and accounts (tests call this between cases). */
 export function resetAdminMock() {
   signedIn = false
   matches = seedMatches()
+  open = false
+  password = MOCK_ADMIN.password
+  accounts = seedAccounts()
+}
+
+/** Pretend no account exists yet, so first-admin setup is open. */
+export function setupOpen(v: boolean) {
+  open = v
+  if (v) accounts = []
 }
 
 const ME: Admin = { id: '1', username: MOCK_ADMIN.username, role: 'admin', last_login_at: null }
@@ -52,7 +71,7 @@ export const adminHandlers = [
   http.post(`${API}/login`, async ({ request }) => {
     await delay(150)
     const body = (await request.json()) as { username?: string; password?: string }
-    if (body.username?.trim().toLowerCase() !== MOCK_ADMIN.username || body.password !== MOCK_ADMIN.password) {
+    if (body.username?.trim().toLowerCase() !== MOCK_ADMIN.username || body.password !== password) {
       return problem(401, 'Wrong username or password.')
     }
     signedIn = true
@@ -62,6 +81,19 @@ export const adminHandlers = [
   http.post(`${API}/logout`, () => {
     signedIn = false
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get(`${API}/setup`, () => HttpResponse.json({ open })),
+
+  http.post(`${API}/setup`, async ({ request }) => {
+    await delay(150)
+    const body = (await request.json()) as { code: string; username: string; password: string }
+    if (!open) return problem(403, 'Setup is closed: an admin account already exists. Sign in instead.')
+    if (body.code !== MOCK_SETUP_CODE) return problem(401, "That setup code isn't right.")
+    open = false
+    signedIn = true
+    accounts = [{ ...ME, username: body.username, disabled: false, created_at: new Date().toISOString() }]
+    return HttpResponse.json({ admin: { ...ME, username: body.username }, expires_at: new Date(Date.now() + 12 * 3600_000).toISOString() })
   }),
 
   // Everything below needs a session.
@@ -107,4 +139,28 @@ export const adminHandlers = [
   }),
 
   http.get(`${API}/thresholds`, () => HttpResponse.json(THRESHOLDS)),
+
+  http.get(`${API}/users`, () => HttpResponse.json(accounts)),
+
+  http.post(`${API}/users`, async ({ request }) => {
+    const body = (await request.json()) as { username: string; password: string }
+    if (accounts.some((a) => a.username === body.username)) return problem(422, `There is already an account called "${body.username}".`)
+    const a: AdminAccount = { id: String(accounts.length + 10), username: body.username, role: 'admin', last_login_at: null, disabled: false, created_at: new Date().toISOString() }
+    accounts = [...accounts, a].sort((x, y) => x.username.localeCompare(y.username))
+    return HttpResponse.json(a, { status: 201 })
+  }),
+
+  http.put(`${API}/users/:username/disabled`, async ({ params, request }) => {
+    const { disabled } = (await request.json()) as { disabled: boolean }
+    if (params.username === MOCK_ADMIN.username) return problem(422, "You can't disable your own account.")
+    accounts = accounts.map((a) => (a.username === params.username ? { ...a, disabled } : a))
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.put(`${API}/me/password`, async ({ request }) => {
+    const body = (await request.json()) as { current_password: string; new_password: string }
+    if (body.current_password !== password) return problem(422, "Your current password isn't right.")
+    password = body.new_password
+    return HttpResponse.json({ admin: ME, expires_at: new Date(Date.now() + 12 * 3600_000).toISOString() })
+  }),
 ]

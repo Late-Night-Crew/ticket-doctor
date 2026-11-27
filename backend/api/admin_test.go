@@ -256,3 +256,95 @@ func decode(t *testing.T, res *http.Response, out any) {
 		t.Fatalf("decode: %v", err)
 	}
 }
+
+func TestAdminFirstSetup(t *testing.T) {
+	pool := dbtest.New(t)
+	cfg := config.Defaults()
+	cfg.Admin.SessionSecret = strings.Repeat("s", 32)
+	cfg.Admin.SetupCode = "open sesame 12345"
+	a := New(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), "test", Deps{Pool: pool, Engine: engine.Default(), Now: func() time.Time { return now }})
+
+	var status struct{ Open bool }
+	if call(t, a, "GET", "/api/admin/setup", "", &status); !status.Open {
+		t.Fatal("setup should be open with a code and no accounts")
+	}
+	var p problem
+	if res := call(t, a, "POST", "/api/admin/setup", `{"code":"guess","username":"joseph","password":"`+testPassword+`"}`, &p); res.StatusCode != 401 {
+		t.Fatalf("wrong code: %d %q", res.StatusCode, p.Detail)
+	}
+	if res := call(t, a, "POST", "/api/admin/setup", `{"code":"open sesame 12345","username":"joseph","password":"short"}`, &p); res.StatusCode != 422 {
+		t.Fatalf("short password: %d %q", res.StatusCode, p.Detail)
+	}
+	res := call(t, a, "POST", "/api/admin/setup", `{"code":"open sesame 12345","username":"joseph","password":"`+testPassword+`"}`, nil)
+	var cookie *http.Cookie
+	for _, c := range res.Cookies() {
+		if c.Name == admin.CookieName {
+			cookie = c
+		}
+	}
+	if res.StatusCode != 200 || cookie == nil {
+		t.Fatalf("setup: %d, cookie %v", res.StatusCode, cookie)
+	}
+	if res := authed(t, a, cookie, "GET", "/api/admin/me", "", nil); res.StatusCode != 200 {
+		t.Fatalf("signed in after setup: %d", res.StatusCode)
+	}
+
+	// Closed for good once an account exists, even with the right code.
+	if call(t, a, "GET", "/api/admin/setup", "", &status); status.Open {
+		t.Fatal("setup still open after the first account")
+	}
+	if res := call(t, a, "POST", "/api/admin/setup", `{"code":"open sesame 12345","username":"mallory","password":"`+testPassword+`"}`, &p); res.StatusCode != 403 {
+		t.Fatalf("second setup: %d %q", res.StatusCode, p.Detail)
+	}
+
+	// Without a setup code it is never open.
+	b := New(config.Defaults(), a.logger, "test", Deps{Pool: pool, Engine: engine.Default()})
+	if res := call(t, b, "POST", "/api/admin/setup", `{"code":"","username":"x","password":"`+testPassword+`"}`, nil); res.StatusCode != 503 {
+		t.Fatalf("setup without a code: %d", res.StatusCode)
+	}
+}
+
+func TestAdminManagesAccounts(t *testing.T) {
+	a, _, _ := newAdminAPI(t)
+	cookie, _ := signIn(t, a, "joseph", testPassword)
+
+	var p problem
+	if res := authed(t, a, cookie, "POST", "/api/admin/users", `{"username":"Grace","password":"`+testPassword+`"}`, nil); res.StatusCode != 201 {
+		t.Fatalf("create: %d", res.StatusCode)
+	}
+	if res := authed(t, a, cookie, "POST", "/api/admin/users", `{"username":"grace","password":"`+testPassword+`"}`, &p); res.StatusCode != 422 || !strings.Contains(p.Detail, "already") {
+		t.Fatalf("duplicate: %d %q", res.StatusCode, p.Detail)
+	}
+	var list []services.AdminAccount
+	if authed(t, a, cookie, "GET", "/api/admin/users", "", &list); len(list) != 2 || list[0].Username != "grace" {
+		t.Fatalf("users: %+v", list)
+	}
+
+	if res := authed(t, a, cookie, "PUT", "/api/admin/users/joseph/disabled", `{"disabled":true}`, &p); res.StatusCode != 422 {
+		t.Fatalf("disable yourself: %d %q", res.StatusCode, p.Detail)
+	}
+	if res := authed(t, a, cookie, "PUT", "/api/admin/users/grace/disabled", `{"disabled":true}`, nil); res.StatusCode != 204 {
+		t.Fatalf("disable grace: %d", res.StatusCode)
+	}
+	if _, res := signIn(t, a, "grace", testPassword); res.StatusCode != 401 {
+		t.Fatalf("disabled grace signed in: %d", res.StatusCode)
+	}
+
+	// Changing your own password needs the current one, keeps this browser
+	// signed in with a new cookie, and ends older sessions.
+	other, _ := signIn(t, a, "joseph", testPassword)
+	if res := authed(t, a, cookie, "PUT", "/api/admin/me/password", `{"current_password":"nope nope nope","new_password":"a brand new password"}`, &p); res.StatusCode != 422 {
+		t.Fatalf("wrong current password: %d", res.StatusCode)
+	}
+	time.Sleep(time.Until(time.Now().Truncate(time.Second).Add(time.Second)))
+	res := authed(t, a, cookie, "PUT", "/api/admin/me/password", `{"current_password":"`+testPassword+`","new_password":"a brand new password"}`, nil)
+	if res.StatusCode != 200 || len(res.Cookies()) == 0 {
+		t.Fatalf("change password: %d", res.StatusCode)
+	}
+	if res := authed(t, a, res.Cookies()[0], "GET", "/api/admin/me", "", nil); res.StatusCode != 200 {
+		t.Fatalf("new cookie: %d", res.StatusCode)
+	}
+	if res := authed(t, a, other, "GET", "/api/admin/me", "", nil); res.StatusCode != 401 {
+		t.Fatalf("other session after the change: %d", res.StatusCode)
+	}
+}

@@ -137,3 +137,62 @@ export function useThresholds() {
 }
 
 export const isSignedOut = (e: unknown) => e instanceof ApiError && e.status === 401
+
+/* ---------- first-admin setup and managing admins ---------- */
+
+export interface AdminAccount extends Admin {
+  disabled: boolean
+  created_at: string
+}
+
+/** Whether /admin/setup can create the first account (a setup code is set and no account exists). */
+export function useSetupStatus() {
+  return useQuery({
+    queryKey: ['admin-setup'],
+    queryFn: () => api<{ open: boolean }>('/admin/setup'),
+    retry: false,
+  })
+}
+
+export function useSetup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { code: string; username: string; password: string }) =>
+      post<{ admin: Admin; expires_at: string }>('/admin/setup', body),
+    onSuccess: (s) => {
+      qc.setQueryData(ME, s.admin)
+      qc.setQueryData(['admin-setup'], { open: false })
+    },
+  })
+}
+
+export function useAdminAccounts() {
+  return useQuery({ queryKey: ['admin', 'users'], queryFn: () => api<AdminAccount[]>('/admin/users') })
+}
+
+export function useCreateAdmin() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { username: string; password: string }) => post<Admin>('/admin/users', body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
+  })
+}
+
+export function useSetDisabled() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ username, disabled }: { username: string; disabled: boolean }) =>
+      put<void>(`/admin/users/${encodeURIComponent(username)}/disabled`, { disabled }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
+  })
+}
+
+/** Change your own password; other sessions end, this one carries on with a new cookie. */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (body: { current_password: string; new_password: string }) =>
+      put<{ admin: Admin; expires_at: string }>('/admin/me/password', body),
+  })
+}
+
+export const MIN_PASSWORD = 12

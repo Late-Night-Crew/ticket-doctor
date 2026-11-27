@@ -13,6 +13,8 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 // The admin area (B6) is its own app shell and its own chunks: public visitors never download it.
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
 const AdminLogin = lazy(() => import('./pages/admin/Login'))
+const AdminSetup = lazy(() => import('./pages/admin/Setup'))
+const AdminAccounts = lazy(() => import('./pages/admin/Admins'))
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'))
 const AdminResults = lazy(() => import('./pages/admin/ResultEntry'))
 const AdminThresholds = lazy(() => import('./pages/admin/Thresholds'))
@@ -22,10 +24,12 @@ export default function App() {
   return (
     <Routes>
       <Route path="admin/login" element={<Lazy><AdminLogin /></Lazy>} />
+      <Route path="admin/setup" element={<Lazy><AdminSetup /></Lazy>} />
       <Route path="admin" element={<Lazy><AdminLayout /></Lazy>}>
         <Route index element={<AdminDashboard />} />
         <Route path="results" element={<AdminResults />} />
         <Route path="thresholds" element={<AdminThresholds />} />
+        <Route path="admins" element={<AdminAccounts />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route element={<AppLayout />}>

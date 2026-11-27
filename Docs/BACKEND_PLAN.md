@@ -189,7 +189,10 @@ Each milestone ends with green CI and a pull request.
 - **Left before calling B5 done:** three days of scheduled imports without errors, and a decision on hosting before the database expires (~27 December).
 
 **B6 Admin (F7)**: done 2026-11-27, backend and pages. It goes live with v0.5.0 once `TD_ADMIN_SESSION_SECRET` is set (DEPLOY.md).
-- **Accounts:** a `users` table holding a username, a bcrypt hash and a role (only `admin` for now). No email or other personal data. No sign-up page: `ticketdoctor admin create|password|disable|enable|list` manages accounts, with passwords typed at a hidden prompt.
+- **Accounts:** a `users` table holding a username, a bcrypt hash and a role (only `admin` for now). No email or other personal data, and no public sign-up.
+  - The first admin is created at `/admin/setup`. It needs `TD_ADMIN_SETUP_CODE` and only works while no account exists.
+  - After that, admins add, disable or enable each other, and change their own passwords, on the Admins page.
+  - `ticketdoctor admin create|password|disable|enable|list` does the same from a terminal.
 - **Sessions:** an HS256 JWT signed with `TD_ADMIN_SESSION_SECRET`, as in parrot, carried in an HttpOnly, SameSite=Strict cookie limited to `/api/admin`.
   - A changed password or a disabled account ends sessions at once.
   - After 10 failed sign-ins, an address is blocked for 15 minutes.

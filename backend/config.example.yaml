@@ -73,3 +73,6 @@ football_data_org:
 admin:
   session_secret: ""
   session_hours: 12          # how long a sign-in lasts (1-168)
+  # Unlocks /admin/setup to create the first admin from the browser; only works
+  # while no account exists. Secret: set TD_ADMIN_SETUP_CODE (16+ characters).
+  setup_code: ""

@@ -38,19 +38,27 @@ func New(auth *services.AuthService, admin *services.AdminService, secure bool) 
 // Register adds the admin routes under r (which is /api).
 func (h *Handler) Register(r fiber.Router) {
 	g := r.Group("/admin", noStore, jsonOnly)
-	// Handlers run in the order given: the limiter must come before login.
-	g.Post("/login", limiter.New(limiter.Config{
+	// Failed sign-ins and setup attempts share one budget per address.
+	// Handlers run in the order given: the limiter must come first.
+	attempts := limiter.New(limiter.Config{
 		Max:                    loginAttempts,
 		Expiration:             loginWindow,
 		SkipSuccessfulRequests: true,
 		LimitReached: func(c fiber.Ctx) error {
 			return problemdetail.TooManyRequests(c, "Too many sign-in attempts. Please wait 15 minutes and try again.")
 		},
-	}), h.login)
+	})
+	g.Post("/login", attempts, h.login)
 	g.Post("/logout", h.logout)
+	g.Get("/setup", h.setupStatus)
+	g.Post("/setup", attempts, h.setup)
 
 	signedIn := g.Group("", h.requireAdmin)
 	signedIn.Get("/me", h.me)
+	signedIn.Put("/me/password", h.changePassword)
+	signedIn.Get("/users", h.users)
+	signedIn.Post("/users", h.createUser)
+	signedIn.Put("/users/:username/disabled", h.setDisabled)
 	signedIn.Get("/dashboard", h.dashboard)
 	signedIn.Get("/matches", h.matches)
 	signedIn.Put("/matches/:id/result", h.enterResult)
@@ -119,6 +127,11 @@ func (h *Handler) login(c fiber.Ctx) error {
 	if err != nil {
 		return apierr.From(err)
 	}
+	return h.startSession(c, s)
+}
+
+// startSession sets the session cookie and answers with the account.
+func (h *Handler) startSession(c fiber.Ctx, s *services.Session) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     CookieName,
 		Value:    s.Token,
@@ -187,3 +200,83 @@ func (h *Handler) enterResult(c fiber.Ctx) error {
 }
 
 func (h *Handler) thresholds(c fiber.Ctx) error { return c.JSON(h.admin.Thresholds()) }
+
+func (h *Handler) setupStatus(c fiber.Ctx) error {
+	open, err := h.auth.SetupOpen(c.Context())
+	if err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{"open": open})
+}
+
+type setupRequest struct {
+	Code     string `json:"code"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// setup creates the first admin (only while there are none) and signs them in.
+func (h *Handler) setup(c fiber.Ctx) error {
+	var req setupRequest
+	if err := apierr.DecodeJSON(c, &req); err != nil {
+		return err
+	}
+	s, err := h.auth.Setup(c.Context(), req.Code, req.Username, req.Password)
+	if err != nil {
+		return apierr.From(err)
+	}
+	return h.startSession(c, s)
+}
+
+func (h *Handler) users(c fiber.Ctx) error {
+	list, err := h.auth.Accounts(c.Context())
+	if err != nil {
+		return err
+	}
+	return c.JSON(list)
+}
+
+func (h *Handler) createUser(c fiber.Ctx) error {
+	var req loginRequest
+	if err := apierr.DecodeJSON(c, &req); err != nil {
+		return err
+	}
+	a, err := h.auth.CreateAdmin(c.Context(), req.Username, req.Password)
+	if err != nil {
+		return apierr.From(err)
+	}
+	return c.Status(fiber.StatusCreated).JSON(a)
+}
+
+func (h *Handler) setDisabled(c fiber.Ctx) error {
+	var req struct {
+		Disabled *bool `json:"disabled"`
+	}
+	if err := apierr.DecodeJSON(c, &req); err != nil {
+		return err
+	}
+	if req.Disabled == nil {
+		return fiber.NewError(fiber.StatusUnprocessableEntity, "Give disabled: true or false.")
+	}
+	if err := h.auth.SetDisabledBy(c.Context(), current(c), c.Params("username"), *req.Disabled); err != nil {
+		return apierr.From(err)
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// changePassword sets a new password for the signed-in admin. Every other
+// session ends; this browser gets a fresh one.
+func (h *Handler) changePassword(c fiber.Ctx) error {
+	var req struct {
+		Current string `json:"current_password"`
+		New     string `json:"new_password"`
+	}
+	if err := apierr.DecodeJSON(c, &req); err != nil {
+		return err
+	}
+	s, err := h.auth.ChangeOwnPassword(c.Context(), current(c), req.Current, req.New)
+	if err != nil {
+		return apierr.From(err)
+	}
+	return h.startSession(c, s)
+}

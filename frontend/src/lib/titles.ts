@@ -2,6 +2,8 @@ import { COPY } from '../config/copy'
 
 const TITLES: [prefix: string, title: string][] = [
   ['/admin/login', 'Admin sign-in'],
+  ['/admin/setup', 'Set up the first admin'],
+  ['/admin/admins', 'Admins · Admin'],
   ['/admin/results', 'Enter results · Admin'],
   ['/admin/thresholds', 'Rule thresholds · Admin'],
   ['/admin', 'Dashboard · Admin'],

@@ -3,7 +3,7 @@ import Offcanvas from 'react-bootstrap/Offcanvas'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { isSignedOut, useAdminMe, useLogout } from '../../api/admin'
 import { ErrorBoundary } from '../../components/ErrorBoundary'
-import { IconGrid, IconLogo, IconLogout, IconMenu, IconPencil, IconSliders } from '../../components/Icons'
+import { IconGrid, IconLogo, IconLogout, IconMenu, IconPencil, IconSliders, IconUsers } from '../../components/Icons'
 import { RouteEffects } from '../../components/RouteEffects'
 import { ThemeToggle } from '../../components/ThemeToggle'
 import { PageSpinner } from '../../components/AppLayout'
@@ -13,6 +13,7 @@ const NAV = [
   { to: '/admin', label: 'Dashboard', icon: IconGrid, end: true },
   { to: '/admin/results', label: 'Enter results', icon: IconPencil, end: false },
   { to: '/admin/thresholds', label: 'Rule thresholds', icon: IconSliders, end: false },
+  { to: '/admin/admins', label: 'Admins', icon: IconUsers, end: false },
 ]
 
 /**

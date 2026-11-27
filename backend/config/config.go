@@ -51,7 +51,16 @@ type AdminConfig struct {
 	SessionSecret string `mapstructure:"session_secret"`
 	// SessionHours is how long a sign-in lasts.
 	SessionHours int `mapstructure:"session_hours"`
+	// SetupCode unlocks /admin/setup, which creates the first admin account
+	// from the browser. It only works while there are no accounts at all, so
+	// it can't be used once someone has signed up. Set it with
+	// TD_ADMIN_SETUP_CODE (at least 16 characters); leave it empty to make
+	// the first account with `ticketdoctor admin create` instead.
+	SetupCode string `mapstructure:"setup_code"`
 }
+
+// MinSetupCode is the shortest setup code accepted.
+const MinSetupCode = 16
 
 // MinSessionSecret is the shortest session secret accepted.
 const MinSessionSecret = 32
@@ -243,6 +252,7 @@ func Load(path string) (*Config, error) {
 //	TD_LOG_LEVEL, TD_LOG_FORMAT
 //	TD_FOOTBALL_DATA_ORG_TOKEN  fixtures API key (secret)
 //	TD_ADMIN_SESSION_SECRET     signs admin sessions (secret)
+//	TD_ADMIN_SETUP_CODE         unlocks first-admin setup in the browser (secret)
 func (c *Config) ApplyEnvironment(lookup func(string) (string, bool)) error {
 	str := func(key string, dst *string) {
 		if v, ok := lookup(key); ok && v != "" {
@@ -263,6 +273,7 @@ func (c *Config) ApplyEnvironment(lookup func(string) (string, bool)) error {
 	str("TD_LOG_FORMAT", &c.Logging.Format)
 	str("TD_FOOTBALL_DATA_ORG_TOKEN", &c.FootballDataOrg.Token)
 	str("TD_ADMIN_SESSION_SECRET", &c.Admin.SessionSecret)
+	str("TD_ADMIN_SETUP_CODE", &c.Admin.SetupCode)
 	list("TD_ALLOWED_ORIGINS", &c.Server.AllowedOrigins)
 	list("TD_TRUSTED_PROXIES", &c.Server.TrustedProxies)
 
@@ -314,6 +325,9 @@ func (c *Config) Validate() error {
 	}
 	if s := c.Admin.SessionSecret; s != "" && len(s) < MinSessionSecret {
 		problems = append(problems, fmt.Sprintf("admin session_secret must be at least %d characters", MinSessionSecret))
+	}
+	if s := c.Admin.SetupCode; s != "" && len(s) < MinSetupCode {
+		problems = append(problems, fmt.Sprintf("admin setup_code must be at least %d characters", MinSetupCode))
 	}
 	if h := c.Admin.SessionHours; h < 1 || h > 24*7 {
 		problems = append(problems, fmt.Sprintf("admin session_hours must be 1-168, got %d", h))

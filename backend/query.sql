@@ -303,3 +303,10 @@ SELECT
 
 -- name: ListImportRuns :many
 SELECT * FROM import_runs ORDER BY started_at DESC LIMIT $1;
+
+-- name: CountUsers :one
+SELECT count(*) FROM users;
+
+-- name: LockUsers :exec
+-- Serialises first-admin setup, so two people can't both create "the first" account.
+LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE;
