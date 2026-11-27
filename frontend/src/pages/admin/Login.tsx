@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
-import { useAdminMe, useLogin } from '../../api/admin'
+import { useAdminMe, useLogin, useSetupStatus } from '../../api/admin'
 import { IconLogo } from '../../components/Icons'
 import { RouteEffects } from '../../components/RouteEffects'
 import { useNoIndex } from './useNoIndex'
@@ -17,6 +17,7 @@ export default function AdminLogin() {
   const navigate = useNavigate()
   const me = useAdminMe()
   const login = useLogin()
+  const setup = useSetupStatus()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
@@ -45,6 +46,11 @@ export default function AdminLogin() {
           </div>
         </div>
 
+        {setup.data?.open && (
+          <div className="alert alert-info py-2 small" role="status">
+            No admin account exists yet. <Link to="/admin/setup">Set up the first admin</Link>.
+          </div>
+        )}
         <form onSubmit={submit} noValidate>
           {login.isError && (
             <div className="alert alert-danger py-2 small" role="alert">
@@ -85,7 +91,7 @@ export default function AdminLogin() {
           </button>
         </form>
         <p className="small text-body-secondary mt-3 mb-0">
-          Accounts are made by the team with <code>ticketdoctor admin create</code>. <Link to="/">Back to the site</Link>
+          Need an account? Ask an admin to add you. <Link to="/">Back to the site</Link>
         </p>
       </main>
     </div>

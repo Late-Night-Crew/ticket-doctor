@@ -109,16 +109,24 @@ pg_dump "$EXTERNAL_DATABASE_URL" --data-only --table=analysed_legs --table=sugge
 - The Blueprint declares the secret with `generateValue`. Auto-sync is off, though, so add it by hand rather than with a Manual Sync. A sync would also reset the API image to the one named in `render.yaml`.
 - Changing the secret signs every admin out.
 
-**2. Create an account** from your own machine. Use the released image, connecting with the database's **External** URL (Render → `ticket-doctor-db` → Connect). Read the URL into a variable so it stays out of your shell history:
+**2. Create the first admin, in the browser.**
+1. On the same Environment page, add `TD_ADMIN_SETUP_CODE` with **Generate** (or any value of 16+ characters), then **Save and deploy**.
+2. When the deploy is live, open `https://ticket-doctor.onrender.com/admin/setup`.
+3. Paste the setup code (the eye or copy icon beside it in Render), choose a username and password, and you're signed in.
+
+Setup only works while **no** admin account exists. After that it refuses even the right code, so a leaked code is useless. Delete `TD_ADMIN_SETUP_CODE` afterwards anyway.
+
+**3. More admins:** go to `/admin` → **Admins**. There you can add an account, disable or enable one, and change your own password. Nobody can disable their own account, so someone can always sign in.
+
+The CLI does the same from a terminal (for example, if every account is locked out). Run it with the database's **External** URL, read so it stays out of shell history:
 
 ```sh
 read -rs TD_DATABASE_URL && export TD_DATABASE_URL   # paste the External URL, press Enter
-docker run -it --rm -e TD_DATABASE_URL ghcr.io/late-night-crew/ticket-doctor-api:v0.5.0 \
-  /app/ticketdoctor admin create joseph              # asks for the password twice
+cd backend && go run . admin create joseph            # or: docker run -it --rm -e TD_DATABASE_URL ghcr.io/late-night-crew/ticket-doctor-api:<tag> /app/ticketdoctor admin create joseph
 unset TD_DATABASE_URL
 ```
 
-`admin password`, `admin disable`, `admin enable` and `admin list` work the same way. Then sign in at `https://ticket-doctor.onrender.com/admin`.
+`admin password`, `admin disable`, `admin enable` and `admin list` work the same way.
 
 ## Day to day
 

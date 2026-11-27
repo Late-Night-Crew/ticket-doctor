@@ -188,6 +188,17 @@ func (q *Queries) CountSettledSuggestions(ctx context.Context, arg CountSettledS
 	return items, nil
 }
 
+const countUsers = `-- name: CountUsers :one
+SELECT count(*) FROM users
+`
+
+func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countUsers)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createUser = `-- name: CreateUser :one
 
 INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, password_hash, role, password_changed_at, disabled, last_login_at, created_at
@@ -1022,6 +1033,16 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockUsers = `-- name: LockUsers :exec
+LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE
+`
+
+// Serialises first-admin setup, so two people can't both create "the first" account.
+func (q *Queries) LockUsers(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockUsers)
+	return err
 }
 
 const recordLogin = `-- name: RecordLogin :exec

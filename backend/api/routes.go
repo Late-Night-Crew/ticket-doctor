@@ -44,7 +44,8 @@ func (a *API) routes() {
 	results.New(services.NewResultsService(d.Pool)).Register(api)
 
 	if secret := a.sessionSecret(); secret != nil {
-		auth := services.NewAuthService(d.Pool, secret, time.Duration(a.cfg.Admin.SessionHours)*time.Hour, d.Now)
+		auth := services.NewAuthService(d.Pool, secret, time.Duration(a.cfg.Admin.SessionHours)*time.Hour, d.Now).
+			WithSetupCode(a.cfg.Admin.SetupCode)
 		adm := services.NewAdminService(d.Pool, d.Engine.Thresholds(), d.Now)
 		admin.New(auth, adm, a.cfg.IsProduction()).Register(api)
 	} else {

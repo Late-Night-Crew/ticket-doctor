@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../../App'
-import { MOCK_ADMIN, resetAdminMock } from '../../mocks/admin'
+import { MOCK_ADMIN, MOCK_SETUP_CODE, resetAdminMock, setupOpen } from '../../mocks/admin'
 import { TicketProvider } from '../../state/TicketContext'
 import { server } from '../../test/server'
 
@@ -104,5 +104,69 @@ describe('Admin area (B6)', () => {
     await signIn(user)
     await user.click(await screen.findByRole('button', { name: 'Sign out' }))
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/admin\/login$/))
+  })
+
+  it('sets up the first admin with the setup code, then signs them in', async () => {
+    setupOpen(true)
+    const user = userEvent.setup()
+    renderAt('/admin/login')
+    await user.click(await screen.findByRole('link', { name: 'Set up the first admin' }))
+
+    await user.type(await screen.findByLabelText('Setup code'), 'wrong code')
+    await user.type(screen.getByLabelText('Username'), 'Joseph')
+    await user.type(screen.getByLabelText('Password'), 'short')
+    expect(screen.getByText('Use at least 12 characters.')).toBeInTheDocument()
+    const submit = screen.getByRole('button', { name: 'Create admin and sign in' })
+    expect(submit).toBeDisabled()
+
+    await user.type(screen.getByLabelText('Password'), ' but now long enough')
+    await user.type(screen.getByLabelText('Same password again'), 'short but now long enough')
+    await user.click(submit)
+    expect(await screen.findByRole('alert')).toHaveTextContent("That setup code isn't right.")
+
+    await user.clear(screen.getByLabelText('Setup code'))
+    await user.type(screen.getByLabelText('Setup code'), MOCK_SETUP_CODE)
+    await user.click(submit)
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByText('joseph')).toBeInTheDocument() // usernames are lowercased
+  })
+
+  it('says setup is closed once an admin exists', async () => {
+    renderAt('/admin/setup')
+    expect(await screen.findByText(/Setup is closed/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Setup code')).not.toBeInTheDocument()
+  })
+
+  it('adds an admin, disables another, and changes your own password', async () => {
+    const user = userEvent.setup()
+    renderAt('/admin/admins')
+    await signIn(user)
+
+    const list = await screen.findByRole('region', { name: 'Accounts' })
+    expect(await within(list).findByText('grace', { selector: '.fw-semibold' })).toBeInTheDocument()
+    // You can't disable yourself, so there's no button on your own row.
+    expect(within(list).queryByRole('button', { name: /Disable admin/ })).not.toBeInTheDocument()
+    await user.click(within(list).getByRole('button', { name: 'Disable grace' }))
+    expect(await within(list).findByText('disabled')).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'Enable grace' })).toBeInTheDocument()
+
+    const add = screen.getByRole('region', { name: 'Add an admin' })
+    await user.type(within(add).getByLabelText('Username'), 'tamanda')
+    await user.type(within(add).getByLabelText('Password'), 'tamanda first password')
+    await user.type(within(add).getByLabelText('Same password again'), 'tamanda first password')
+    await user.click(within(add).getByRole('button', { name: 'Add admin' }))
+    expect(await within(add).findByRole('status')).toHaveTextContent('Added tamanda.')
+    expect(await within(list).findByText('tamanda', { selector: '.fw-semibold' })).toBeInTheDocument()
+
+    const change = screen.getByRole('region', { name: 'Change your password' })
+    await user.type(within(change).getByLabelText('Current password'), 'not my password')
+    await user.type(within(change).getByLabelText('New password'), 'a brand new password')
+    await user.type(within(change).getByLabelText('Same password again'), 'a brand new password')
+    await user.click(within(change).getByRole('button', { name: 'Change password' }))
+    expect(await within(change).findByRole('alert')).toHaveTextContent("Your current password isn't right.")
+    await user.clear(within(change).getByLabelText('Current password'))
+    await user.type(within(change).getByLabelText('Current password'), MOCK_ADMIN.password)
+    await user.click(within(change).getByRole('button', { name: 'Change password' }))
+    expect(await within(change).findByRole('status')).toHaveTextContent('Password changed.')
   })
 })

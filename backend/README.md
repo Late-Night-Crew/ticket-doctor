@@ -32,9 +32,12 @@ The server needs the database. To run the frontend against it instead of the moc
 | `GET /api/admin/dashboard` | Match, ticket and suggestion counts, plus the last 10 import runs |
 | `GET /api/admin/matches?view=awaiting\|recent&league=` | Games kicked off with no result yet, or finished in the last two weeks |
 | `PUT /api/admin/matches/:id/result` | Enter or correct a final score (FR-1.4) |
+| `GET /api/admin/setup`, `POST /api/admin/setup` | First-admin setup: only while no account exists, and only with `TD_ADMIN_SETUP_CODE` |
+| `GET /api/admin/users`, `POST /api/admin/users`, `PUT /api/admin/users/:username/disabled` | List, add, disable or enable admins (nobody can disable themselves) |
+| `PUT /api/admin/me/password` | Change your own password (ends your other sessions) |
 | `GET /api/admin/thresholds` | The rule thresholds in use, with the SRS defaults |
 
-Every `/api/admin` route except login and logout needs a signed-in admin. Accounts are made from the CLI (there is no sign-up page):
+Every `/api/admin` route except login, logout and setup needs a signed-in admin. There is no public sign-up. The first admin is made at `/admin/setup` with the setup code; after that, admins add others on the Admins page. The CLI does the same:
 
 ```sh
 ticketdoctor admin create joseph     # asks for the password twice
