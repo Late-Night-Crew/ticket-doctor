@@ -119,3 +119,110 @@ INSERT INTO import_runs DEFAULT VALUES RETURNING id;
 UPDATE import_runs
 SET finished_at = now(), status = $2, summary = $3, error = $4
 WHERE id = $1;
+
+-- ---------- fixtures (B3) ----------
+
+-- name: ListFixtures :many
+-- Games not yet played with kick-off in [from, to), optionally one league.
+SELECT m.id, m.league_id, m.kickoff,
+       h.id AS home_id, h.name AS home_name, h.form AS home_form,
+       a.id AS away_id, a.name AS away_name, a.form AS away_form
+FROM matches m
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE m.status = 'scheduled'
+  AND m.kickoff >= sqlc.arg(kickoff_from)::timestamptz
+  AND (sqlc.narg(kickoff_to)::timestamptz IS NULL OR m.kickoff < sqlc.narg(kickoff_to)::timestamptz)
+  AND (sqlc.narg(league_id)::text IS NULL OR m.league_id = sqlc.narg(league_id)::text)
+ORDER BY m.kickoff, m.league_id, h.name;
+
+-- name: GetMatchesByIDs :many
+-- Matches by id in any status, for analysing a ticket.
+SELECT m.id, m.league_id, m.kickoff, m.status,
+       h.id AS home_id, h.name AS home_name, h.form AS home_form,
+       a.id AS away_id, a.name AS away_name, a.form AS away_form
+FROM matches m
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE m.id = ANY (sqlc.arg(ids)::bigint[]);
+
+-- name: ListProfilesForTeams :many
+SELECT * FROM team_profiles
+WHERE team_id = ANY (sqlc.arg(team_ids)::bigint[]) AND window_n = sqlc.arg(window_n);
+
+-- ---------- ticket log (B3, SRS addendum A6) ----------
+
+-- name: ListTicketLegs :many
+SELECT * FROM analysed_legs WHERE ticket_id = $1;
+
+-- name: InsertTicketLeg :one
+INSERT INTO analysed_legs (ticket_id, origin, match_id, original_market, original_odds,
+                           original_estimate, original_band, final_market)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $4)
+RETURNING id;
+
+-- name: UpdateTicketLeg :exec
+-- Saves the latest analysis of a leg and puts it back on the ticket.
+UPDATE analysed_legs
+SET origin            = $2,
+    original_market   = $3,
+    original_odds     = $4,
+    original_estimate = $5,
+    original_band     = $6,
+    final_market      = $7,
+    on_ticket         = true,
+    updated_at        = now()
+WHERE id = $1;
+
+-- name: TakeLegsOffTicket :exec
+-- Marks a ticket's legs that are no longer on it (FR-7.1d).
+UPDATE analysed_legs
+SET on_ticket = false, updated_at = now()
+WHERE ticket_id = $1 AND on_ticket AND NOT (id = ANY (sqlc.arg(keep)::bigint[]));
+
+-- name: DeleteLegSuggestions :exec
+-- The user changed their own pick: suggestions for the old pick no longer apply.
+DELETE FROM suggestions WHERE analysed_leg_id = $1;
+
+-- name: ListLegSuggestions :many
+SELECT * FROM suggestions WHERE analysed_leg_id = ANY (sqlc.arg(leg_ids)::bigint[]);
+
+-- name: UpsertSuggestion :one
+INSERT INTO suggestions (analysed_leg_id, market, estimate, risk_band)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (analysed_leg_id, market) DO UPDATE
+SET estimate = EXCLUDED.estimate, risk_band = EXCLUDED.risk_band
+RETURNING id;
+
+-- name: SyncAcceptedSuggestions :exec
+-- A suggestion counts as accepted while it is the leg's final pick.
+UPDATE suggestions s
+SET accepted = (s.market = l.final_market)
+FROM analysed_legs l
+WHERE l.id = s.analysed_leg_id AND l.id = $1 AND s.accepted IS DISTINCT FROM (s.market = l.final_market);
+
+-- name: AcceptSuggestion :execrows
+UPDATE suggestions SET accepted = true WHERE id = $1;
+
+-- ---------- results (B3) ----------
+
+-- name: ListSettledLegs :many
+-- Legs still on their ticket whose match has finished, with the score.
+SELECT l.id, m.league_id, l.original_market, m.home_goals, m.away_goals,
+       EXISTS (SELECT 1 FROM suggestions s WHERE s.analysed_leg_id = l.id) AS had_suggestion
+FROM analysed_legs l
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished';
+
+-- name: ListSettledSuggestions :many
+SELECT s.market, m.league_id, m.home_goals, m.away_goals
+FROM suggestions s
+JOIN analysed_legs l ON l.id = s.analysed_leg_id
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished';
+
+-- name: LastSuccessfulImport :one
+SELECT finished_at FROM import_runs
+WHERE status = 'succeeded' AND finished_at IS NOT NULL
+ORDER BY finished_at DESC
+LIMIT 1;

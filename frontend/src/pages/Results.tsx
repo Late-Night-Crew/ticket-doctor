@@ -14,7 +14,7 @@ import { totals } from '../lib/results'
 
 const ALL = 'all'
 
-/** Public track record: original picks vs suggested swaps (FR-7.3, RG-3). */
+/** Public track record: original picks vs suggested swaps, plus the like-for-like group (FR-7.3, RG-3, addendum A6). */
 export default function Results() {
   const c = COPY.results
   const marketId = useId()
@@ -82,10 +82,13 @@ export default function Results() {
       ) : (
         <>
           <div className="row g-3 mb-4">
-            <div className="col-12 col-md-6">
+            <div className="col-12 col-md-4">
               <RecordCard title={c.original} help={c.originalHelp} count={sum.original} />
             </div>
-            <div className="col-12 col-md-6">
+            <div className="col-12 col-md-4">
+              <RecordCard title={c.offered} help={c.offeredHelp} count={sum.original_with_suggestion} />
+            </div>
+            <div className="col-12 col-md-4">
               <RecordCard title={c.suggested} help={c.suggestedHelp} count={sum.suggested} />
             </div>
           </div>
@@ -97,13 +100,16 @@ export default function Results() {
       {results.data && (
         <ul className="small text-body-secondary mt-3 ps-3">
           <li>{c.groupsNote}</li>
+          <li>{c.countingNote}</li>
           <li>{c.pendingNote}</li>
           <li>{c.smallSampleNote(RULES.results.smallSample)}</li>
           <li>{c.pastNote}</li>
           <li>
-            {c.updated(
-              new Date(results.data.updated_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
-            )}
+            {results.data.updated_at
+              ? c.updated(
+                  new Date(results.data.updated_at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+                )
+              : c.notUpdated}
           </li>
         </ul>
       )}

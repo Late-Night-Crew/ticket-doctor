@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"ticketdoctor/api"
+	"ticketdoctor/db"
+	"ticketdoctor/engine"
 	"ticketdoctor/logging/loggedmodule"
 )
 
@@ -19,13 +21,28 @@ var serverCmd = &cobra.Command{
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
+		conn := cfg.Database.ConnString()
+		if conn == "" {
+			return errNoDatabase
+		}
+		pool, err := db.OpenPool(ctx, conn, cfg.Database.MaxConns)
+		if err != nil {
+			return err
+		}
+		defer pool.Close()
+		eng, err := engine.New(cfg.Rules.Thresholds())
+		if err != nil {
+			return err
+		}
+
 		logger.Info("starting API",
 			loggedmodule.Attr(loggedmodule.Server),
 			"address", cfg.ListenAddress(),
 			"environment", cfg.Environment,
+			"database", cfg.Database.Describe(),
 			"version", version,
 		)
-		if err := api.New(cfg, logger, version).Start(ctx); err != nil {
+		if err := api.New(cfg, logger, version, api.Deps{Pool: pool, Engine: eng}).Start(ctx); err != nil {
 			return err
 		}
 		logger.Info("API stopped", loggedmodule.Attr(loggedmodule.Server))

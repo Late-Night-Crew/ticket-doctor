@@ -10,6 +10,18 @@ import (
 	"time"
 )
 
+const acceptSuggestion = `-- name: AcceptSuggestion :execrows
+UPDATE suggestions SET accepted = true WHERE id = $1
+`
+
+func (q *Queries) AcceptSuggestion(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.Exec(ctx, acceptSuggestion, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const addTeamAlias = `-- name: AddTeamAlias :exec
 UPDATE teams
 SET aliases = array_append(aliases, $2::text)
@@ -66,6 +78,16 @@ func (q *Queries) CountMatchesByLeague(ctx context.Context) ([]CountMatchesByLea
 	return items, nil
 }
 
+const deleteLegSuggestions = `-- name: DeleteLegSuggestions :exec
+DELETE FROM suggestions WHERE analysed_leg_id = $1
+`
+
+// The user changed their own pick: suggestions for the old pick no longer apply.
+func (q *Queries) DeleteLegSuggestions(ctx context.Context, analysedLegID int64) error {
+	_, err := q.db.Exec(ctx, deleteLegSuggestions, analysedLegID)
+	return err
+}
+
 const finishImportRun = `-- name: FinishImportRun :exec
 UPDATE import_runs
 SET finished_at = now(), status = $2, summary = $3, error = $4
@@ -108,6 +130,61 @@ func (q *Queries) GetLeague(ctx context.Context, id string) (League, error) {
 	return i, err
 }
 
+const getMatchesByIDs = `-- name: GetMatchesByIDs :many
+SELECT m.id, m.league_id, m.kickoff, m.status,
+       h.id AS home_id, h.name AS home_name, h.form AS home_form,
+       a.id AS away_id, a.name AS away_name, a.form AS away_form
+FROM matches m
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE m.id = ANY ($1::bigint[])
+`
+
+type GetMatchesByIDsRow struct {
+	ID       int64
+	LeagueID string
+	Kickoff  time.Time
+	Status   string
+	HomeID   int64
+	HomeName string
+	HomeForm string
+	AwayID   int64
+	AwayName string
+	AwayForm string
+}
+
+// Matches by id in any status, for analysing a ticket.
+func (q *Queries) GetMatchesByIDs(ctx context.Context, ids []int64) ([]GetMatchesByIDsRow, error) {
+	rows, err := q.db.Query(ctx, getMatchesByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetMatchesByIDsRow{}
+	for rows.Next() {
+		var i GetMatchesByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LeagueID,
+			&i.Kickoff,
+			&i.Status,
+			&i.HomeID,
+			&i.HomeName,
+			&i.HomeForm,
+			&i.AwayID,
+			&i.AwayName,
+			&i.AwayForm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertTeam = `-- name: InsertTeam :one
 INSERT INTO teams (league_id, name, name_key)
 VALUES ($1, $2, $3)
@@ -133,6 +210,52 @@ func (q *Queries) InsertTeam(ctx context.Context, arg InsertTeamParams) (Team, e
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const insertTicketLeg = `-- name: InsertTicketLeg :one
+INSERT INTO analysed_legs (ticket_id, origin, match_id, original_market, original_odds,
+                           original_estimate, original_band, final_market)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $4)
+RETURNING id
+`
+
+type InsertTicketLegParams struct {
+	TicketID         string
+	Origin           string
+	MatchID          int64
+	OriginalMarket   string
+	OriginalOdds     *float64
+	OriginalEstimate float64
+	OriginalBand     string
+}
+
+func (q *Queries) InsertTicketLeg(ctx context.Context, arg InsertTicketLegParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertTicketLeg,
+		arg.TicketID,
+		arg.Origin,
+		arg.MatchID,
+		arg.OriginalMarket,
+		arg.OriginalOdds,
+		arg.OriginalEstimate,
+		arg.OriginalBand,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const lastSuccessfulImport = `-- name: LastSuccessfulImport :one
+SELECT finished_at FROM import_runs
+WHERE status = 'succeeded' AND finished_at IS NOT NULL
+ORDER BY finished_at DESC
+LIMIT 1
+`
+
+func (q *Queries) LastSuccessfulImport(ctx context.Context) (*time.Time, error) {
+	row := q.db.QueryRow(ctx, lastSuccessfulImport)
+	var finished_at *time.Time
+	err := row.Scan(&finished_at)
+	return finished_at, err
 }
 
 const listFinishedMatchesByLeague = `-- name: ListFinishedMatchesByLeague :many
@@ -177,6 +300,71 @@ func (q *Queries) ListFinishedMatchesByLeague(ctx context.Context, leagueID stri
 	return items, nil
 }
 
+const listFixtures = `-- name: ListFixtures :many
+
+SELECT m.id, m.league_id, m.kickoff,
+       h.id AS home_id, h.name AS home_name, h.form AS home_form,
+       a.id AS away_id, a.name AS away_name, a.form AS away_form
+FROM matches m
+JOIN teams h ON h.id = m.home_team_id
+JOIN teams a ON a.id = m.away_team_id
+WHERE m.status = 'scheduled'
+  AND m.kickoff >= $1::timestamptz
+  AND ($2::timestamptz IS NULL OR m.kickoff < $2::timestamptz)
+  AND ($3::text IS NULL OR m.league_id = $3::text)
+ORDER BY m.kickoff, m.league_id, h.name
+`
+
+type ListFixturesParams struct {
+	KickoffFrom time.Time
+	KickoffTo   *time.Time
+	LeagueID    *string
+}
+
+type ListFixturesRow struct {
+	ID       int64
+	LeagueID string
+	Kickoff  time.Time
+	HomeID   int64
+	HomeName string
+	HomeForm string
+	AwayID   int64
+	AwayName string
+	AwayForm string
+}
+
+// ---------- fixtures (B3) ----------
+// Games not yet played with kick-off in [from, to), optionally one league.
+func (q *Queries) ListFixtures(ctx context.Context, arg ListFixturesParams) ([]ListFixturesRow, error) {
+	rows, err := q.db.Query(ctx, listFixtures, arg.KickoffFrom, arg.KickoffTo, arg.LeagueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFixturesRow{}
+	for rows.Next() {
+		var i ListFixturesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LeagueID,
+			&i.Kickoff,
+			&i.HomeID,
+			&i.HomeName,
+			&i.HomeForm,
+			&i.AwayID,
+			&i.AwayName,
+			&i.AwayForm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLeagues = `-- name: ListLeagues :many
 
 
@@ -203,6 +391,38 @@ func (q *Queries) ListLeagues(ctx context.Context) ([]League, error) {
 			&i.FdCode,
 			&i.CreatedAt,
 			&i.FdoCode,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLegSuggestions = `-- name: ListLegSuggestions :many
+SELECT id, analysed_leg_id, market, estimate, risk_band, accepted, created_at FROM suggestions WHERE analysed_leg_id = ANY ($1::bigint[])
+`
+
+func (q *Queries) ListLegSuggestions(ctx context.Context, legIds []int64) ([]Suggestion, error) {
+	rows, err := q.db.Query(ctx, listLegSuggestions, legIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Suggestion{}
+	for rows.Next() {
+		var i Suggestion
+		if err := rows.Scan(
+			&i.ID,
+			&i.AnalysedLegID,
+			&i.Market,
+			&i.Estimate,
+			&i.RiskBand,
+			&i.Accepted,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -285,6 +505,140 @@ func (q *Queries) ListProfilesByLeague(ctx context.Context, arg ListProfilesByLe
 	return items, nil
 }
 
+const listProfilesForTeams = `-- name: ListProfilesForTeams :many
+SELECT team_id, venue, window_n, sample_size, win_rate, draw_rate, loss_rate, gf_avg, ga_avg, scored_rate, clean_sheet_rate, btts_rate, over15_rate, over25_rate, under35_rate, updated_at FROM team_profiles
+WHERE team_id = ANY ($1::bigint[]) AND window_n = $2
+`
+
+type ListProfilesForTeamsParams struct {
+	TeamIds []int64
+	WindowN int16
+}
+
+func (q *Queries) ListProfilesForTeams(ctx context.Context, arg ListProfilesForTeamsParams) ([]TeamProfile, error) {
+	rows, err := q.db.Query(ctx, listProfilesForTeams, arg.TeamIds, arg.WindowN)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TeamProfile{}
+	for rows.Next() {
+		var i TeamProfile
+		if err := rows.Scan(
+			&i.TeamID,
+			&i.Venue,
+			&i.WindowN,
+			&i.SampleSize,
+			&i.WinRate,
+			&i.DrawRate,
+			&i.LossRate,
+			&i.GfAvg,
+			&i.GaAvg,
+			&i.ScoredRate,
+			&i.CleanSheetRate,
+			&i.BttsRate,
+			&i.Over15Rate,
+			&i.Over25Rate,
+			&i.Under35Rate,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSettledLegs = `-- name: ListSettledLegs :many
+
+SELECT l.id, m.league_id, l.original_market, m.home_goals, m.away_goals,
+       EXISTS (SELECT 1 FROM suggestions s WHERE s.analysed_leg_id = l.id) AS had_suggestion
+FROM analysed_legs l
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+`
+
+type ListSettledLegsRow struct {
+	ID             int64
+	LeagueID       string
+	OriginalMarket string
+	HomeGoals      *int16
+	AwayGoals      *int16
+	HadSuggestion  bool
+}
+
+// ---------- results (B3) ----------
+// Legs still on their ticket whose match has finished, with the score.
+func (q *Queries) ListSettledLegs(ctx context.Context) ([]ListSettledLegsRow, error) {
+	rows, err := q.db.Query(ctx, listSettledLegs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSettledLegsRow{}
+	for rows.Next() {
+		var i ListSettledLegsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LeagueID,
+			&i.OriginalMarket,
+			&i.HomeGoals,
+			&i.AwayGoals,
+			&i.HadSuggestion,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSettledSuggestions = `-- name: ListSettledSuggestions :many
+SELECT s.market, m.league_id, m.home_goals, m.away_goals
+FROM suggestions s
+JOIN analysed_legs l ON l.id = s.analysed_leg_id
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+`
+
+type ListSettledSuggestionsRow struct {
+	Market    string
+	LeagueID  string
+	HomeGoals *int16
+	AwayGoals *int16
+}
+
+func (q *Queries) ListSettledSuggestions(ctx context.Context) ([]ListSettledSuggestionsRow, error) {
+	rows, err := q.db.Query(ctx, listSettledSuggestions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSettledSuggestionsRow{}
+	for rows.Next() {
+		var i ListSettledSuggestionsRow
+		if err := rows.Scan(
+			&i.Market,
+			&i.LeagueID,
+			&i.HomeGoals,
+			&i.AwayGoals,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeamsByLeague = `-- name: ListTeamsByLeague :many
 
 SELECT id, league_id, name, name_key, aliases, form, created_at FROM teams WHERE league_id = $1 ORDER BY name
@@ -319,6 +673,45 @@ func (q *Queries) ListTeamsByLeague(ctx context.Context, leagueID string) ([]Tea
 	return items, nil
 }
 
+const listTicketLegs = `-- name: ListTicketLegs :many
+
+SELECT id, ticket_id, origin, match_id, original_market, original_odds, original_estimate, original_band, final_market, on_ticket, created_at, updated_at FROM analysed_legs WHERE ticket_id = $1
+`
+
+// ---------- ticket log (B3, SRS addendum A6) ----------
+func (q *Queries) ListTicketLegs(ctx context.Context, ticketID string) ([]AnalysedLeg, error) {
+	rows, err := q.db.Query(ctx, listTicketLegs, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AnalysedLeg{}
+	for rows.Next() {
+		var i AnalysedLeg
+		if err := rows.Scan(
+			&i.ID,
+			&i.TicketID,
+			&i.Origin,
+			&i.MatchID,
+			&i.OriginalMarket,
+			&i.OriginalOdds,
+			&i.OriginalEstimate,
+			&i.OriginalBand,
+			&i.FinalMarket,
+			&i.OnTicket,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const startImportRun = `-- name: StartImportRun :one
 
 INSERT INTO import_runs DEFAULT VALUES RETURNING id
@@ -332,6 +725,36 @@ func (q *Queries) StartImportRun(ctx context.Context) (int64, error) {
 	return id, err
 }
 
+const syncAcceptedSuggestions = `-- name: SyncAcceptedSuggestions :exec
+UPDATE suggestions s
+SET accepted = (s.market = l.final_market)
+FROM analysed_legs l
+WHERE l.id = s.analysed_leg_id AND l.id = $1 AND s.accepted IS DISTINCT FROM (s.market = l.final_market)
+`
+
+// A suggestion counts as accepted while it is the leg's final pick.
+func (q *Queries) SyncAcceptedSuggestions(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, syncAcceptedSuggestions, id)
+	return err
+}
+
+const takeLegsOffTicket = `-- name: TakeLegsOffTicket :exec
+UPDATE analysed_legs
+SET on_ticket = false, updated_at = now()
+WHERE ticket_id = $1 AND on_ticket AND NOT (id = ANY ($2::bigint[]))
+`
+
+type TakeLegsOffTicketParams struct {
+	TicketID string
+	Keep     []int64
+}
+
+// Marks a ticket's legs that are no longer on it (FR-7.1d).
+func (q *Queries) TakeLegsOffTicket(ctx context.Context, arg TakeLegsOffTicketParams) error {
+	_, err := q.db.Exec(ctx, takeLegsOffTicket, arg.TicketID, arg.Keep)
+	return err
+}
+
 const updateTeamForm = `-- name: UpdateTeamForm :exec
 UPDATE teams SET form = $2 WHERE id = $1
 `
@@ -343,6 +766,43 @@ type UpdateTeamFormParams struct {
 
 func (q *Queries) UpdateTeamForm(ctx context.Context, arg UpdateTeamFormParams) error {
 	_, err := q.db.Exec(ctx, updateTeamForm, arg.ID, arg.Form)
+	return err
+}
+
+const updateTicketLeg = `-- name: UpdateTicketLeg :exec
+UPDATE analysed_legs
+SET origin            = $2,
+    original_market   = $3,
+    original_odds     = $4,
+    original_estimate = $5,
+    original_band     = $6,
+    final_market      = $7,
+    on_ticket         = true,
+    updated_at        = now()
+WHERE id = $1
+`
+
+type UpdateTicketLegParams struct {
+	ID               int64
+	Origin           string
+	OriginalMarket   string
+	OriginalOdds     *float64
+	OriginalEstimate float64
+	OriginalBand     string
+	FinalMarket      string
+}
+
+// Saves the latest analysis of a leg and puts it back on the ticket.
+func (q *Queries) UpdateTicketLeg(ctx context.Context, arg UpdateTicketLegParams) error {
+	_, err := q.db.Exec(ctx, updateTicketLeg,
+		arg.ID,
+		arg.Origin,
+		arg.OriginalMarket,
+		arg.OriginalOdds,
+		arg.OriginalEstimate,
+		arg.OriginalBand,
+		arg.FinalMarket,
+	)
 	return err
 }
 
@@ -456,6 +916,33 @@ func (q *Queries) UpsertMatch(ctx context.Context, arg UpsertMatchParams) (Upser
 	var i UpsertMatchRow
 	err := row.Scan(&i.ID, &i.Inserted)
 	return i, err
+}
+
+const upsertSuggestion = `-- name: UpsertSuggestion :one
+INSERT INTO suggestions (analysed_leg_id, market, estimate, risk_band)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (analysed_leg_id, market) DO UPDATE
+SET estimate = EXCLUDED.estimate, risk_band = EXCLUDED.risk_band
+RETURNING id
+`
+
+type UpsertSuggestionParams struct {
+	AnalysedLegID int64
+	Market        string
+	Estimate      float64
+	RiskBand      string
+}
+
+func (q *Queries) UpsertSuggestion(ctx context.Context, arg UpsertSuggestionParams) (int64, error) {
+	row := q.db.QueryRow(ctx, upsertSuggestion,
+		arg.AnalysedLegID,
+		arg.Market,
+		arg.Estimate,
+		arg.RiskBand,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const upsertTeamProfile = `-- name: UpsertTeamProfile :exec

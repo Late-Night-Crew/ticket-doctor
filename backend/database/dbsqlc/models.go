@@ -8,6 +8,21 @@ import (
 	"time"
 )
 
+type AnalysedLeg struct {
+	ID               int64
+	TicketID         string
+	Origin           string
+	MatchID          int64
+	OriginalMarket   string
+	OriginalOdds     *float64
+	OriginalEstimate float64
+	OriginalBand     string
+	FinalMarket      string
+	OnTicket         bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type ImportRun struct {
 	ID         int64
 	StartedAt  time.Time
@@ -42,6 +57,16 @@ type Match struct {
 	OddsAway   *float64
 	Source     string
 	UpdatedAt  time.Time
+}
+
+type Suggestion struct {
+	ID            int64
+	AnalysedLegID int64
+	Market        string
+	Estimate      float64
+	RiskBand      string
+	Accepted      bool
+	CreatedAt     time.Time
 }
 
 type Team struct {

@@ -34,9 +34,20 @@ describe('Results page (FR-7.3, RG-3)', () => {
     expect(won.parentElement).toBe(lost.parentElement)
   })
 
-  it('says the two groups are not a like-for-like comparison', async () => {
+  it('shows the like-for-like group and explains how picks are counted (addendum A6)', async () => {
     renderResults()
-    expect(await screen.findByText(/not a like-for-like comparison/)).toBeInTheDocument()
+    const sum = totals(RESULTS.rows)
+    const offered = await screen.findByRole('region', { name: 'Picks we offered a swap for' })
+    expect(within(offered).getByText(pct(hitRate(sum.original_with_suggestion)!))).toBeInTheDocument()
+    expect(within(offered).getByText(`${sum.original_with_suggestion.lost} lost`)).toBeInTheDocument()
+    expect(screen.getByText(/compare our swaps with "Picks we offered a swap for"/)).toBeInTheDocument()
+    expect(screen.getByText(/Each match on a ticket counts once/)).toBeInTheDocument()
+  })
+
+  it('says when nothing has been imported yet', async () => {
+    server.use(http.get('*/api/results', () => HttpResponse.json({ updated_at: null, rows: RESULTS.rows })))
+    renderResults()
+    expect(await screen.findByText('No results have been imported yet.')).toBeInTheDocument()
   })
 
   it('lists a row per market and league, flagging small samples and unsettled cells', async () => {
