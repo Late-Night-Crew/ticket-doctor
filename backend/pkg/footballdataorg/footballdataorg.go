@@ -1,9 +1,11 @@
 // Package footballdataorg reads upcoming fixtures from the football-data.org
 // API (v4), the fixtures source chosen in decision D4 (FR-1.2).
 //
-// Results still come from football-data.co.uk (package footballdata), which
-// also has closing odds. This package only supplies kick-off times for games
-// not yet played, and tells us when a game is postponed.
+// Results come from football-data.co.uk (package footballdata), which also has
+// closing odds, but it posts them a day or more late. So this package also
+// passes on football-data.org's full-time score for finished games, which
+// settles tickets within minutes (addendum A10); football-data.co.uk replaces
+// it when it arrives.
 //
 // The free tier allows 10 requests a minute with an API key (X-Auth-Token).
 // An import makes one request per league.
@@ -27,8 +29,8 @@ const (
 	// Postponed: postponed, suspended or cancelled. Hidden from fixture lists
 	// until the source gives it a new date.
 	Postponed Status = "postponed"
-	// Skip: in play or played. Results come from football-data.co.uk, so the
-	// fixtures import leaves these alone.
+	// Skip: in play or played. The fixtures import leaves these alone; a
+	// finished one may carry a Score.
 	Skip Status = ""
 )
 
@@ -57,6 +59,15 @@ type Fixture struct {
 	Status    Status
 	Home      Team
 	Away      Team
+	// Score is the full-time result, set only for a finished (or awarded) game
+	// decided in normal time: bets settle on 90 minutes, so a game that went to
+	// extra time is left to the results file.
+	Score *Score
+}
+
+// Score is a full-time result.
+type Score struct {
+	Home, Away int
 }
 
 // Team carries both of the API's names: matching tries the full name first,
@@ -77,6 +88,13 @@ type response struct {
 		} `json:"season"`
 		HomeTeam apiTeam `json:"homeTeam"`
 		AwayTeam apiTeam `json:"awayTeam"`
+		Score    struct {
+			Duration string `json:"duration"`
+			FullTime struct {
+				Home *int `json:"home"`
+				Away *int `json:"away"`
+			} `json:"fullTime"`
+		} `json:"score"`
 	} `json:"matches"`
 }
 
@@ -111,6 +129,12 @@ func Parse(r io.Reader) ([]Fixture, error) {
 		if home.Name == "" || away.Name == "" {
 			return nil, fmt.Errorf("match %d: a team is missing", m.ID)
 		}
+		var score *Score
+		ft := m.Score.FullTime
+		if (m.Status == "FINISHED" || m.Status == "AWARDED") && m.Score.Duration == "REGULAR" &&
+			ft.Home != nil && ft.Away != nil && *ft.Home >= 0 && *ft.Away >= 0 {
+			score = &Score{Home: *ft.Home, Away: *ft.Away}
+		}
 		out = append(out, Fixture{
 			ID:        m.ID,
 			Kickoff:   kickoff.UTC(),
@@ -119,6 +143,7 @@ func Parse(r io.Reader) ([]Fixture, error) {
 			Status:    status,
 			Home:      home,
 			Away:      away,
+			Score:     score,
 		})
 	}
 	return out, nil

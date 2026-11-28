@@ -2,7 +2,7 @@
 
 Go API for Ticket Doctor. It has the same layout as the Late Night Crew School Management System backend (and parrot), so it should feel familiar. The plan is in [../Docs/BACKEND_PLAN.md](../Docs/BACKEND_PLAN.md).
 
-> Status: **B0 to B5 done and live on Render; B6 (admin) backend done.** CLI (`server`, `migrate`, `import`, `admin`), rules engine, results and fixtures import, team profiles, settlement, admin sign-in and result entry, and every endpoint the frontend uses.
+> Status: **B0 to B5 done and live on Render; B6 (admin) backend done.** CLI (`server`, `migrate`, `import`, `scores`, `admin`, `backtest`), rules engine, results and fixtures import, team profiles, settlement, admin sign-in and result entry, and every endpoint the frontend uses.
 
 ## Run it
 
@@ -30,7 +30,7 @@ The server needs the database. To run the frontend against it instead of the moc
 | `GET /api/results?league=&market=` | Track record, including the like-for-like group |
 | `POST /api/admin/login`, `POST /api/admin/logout`, `GET /api/admin/me` | Admin sign-in, using an HttpOnly session cookie |
 | `POST /api/saved`, `GET /api/saved/:id`, `GET /api/saved?ids=`, `DELETE /api/saved/:id` | V2 saved tickets: save a snapshot, open it by its link, list a browser's tickets, delete (needs the ticket's own id) |
-| `GET /api/admin/dashboard` | Match, ticket and suggestion counts, plus the last 10 import runs |
+| `GET /api/admin/dashboard` | Match, ticket and suggestion counts, the last 10 import runs and the last 5 score checks |
 | `GET /api/admin/matches?view=awaiting\|recent&league=` | Games kicked off with no result yet, or finished in the last two weeks |
 | `PUT /api/admin/matches/:id/result` | Enter or correct a final score (FR-1.4) |
 | `GET /api/admin/setup`, `POST /api/admin/setup` | First-admin setup: only while no account exists, and only with `TD_ADMIN_SETUP_CODE` |
@@ -54,6 +54,8 @@ POST requests are limited to 30 a minute per IP. Errors are problem details whos
 
 Fixtures need a free football-data.org API key in `football_data_org.token` (your `config.yaml`) or `TD_FOOTBALL_DATA_ORG_TOKEN`; without one, a development import loads results only.
 
+`ticketdoctor scores` is the quick match-day check (addendum A10). It saves football-data.org's full-time scores for games that kicked off between 36 hours and 100 minutes ago with no result yet, rebuilds those leagues' profiles and settles saved tickets. With nothing to check it makes no request. GitHub Actions runs it every 15 minutes on match days (`scores.yml`). The results file still wins when it arrives, and the import lists any score it corrected.
+
 `task import -- --league epl --season 2627` imports one league or season; `--from-dir` reads CSVs from disk instead of downloading; `--no-fixtures` skips fixtures. Re-running is safe: unchanged matches are left alone, and every run is recorded in `import_runs`.
 
 ### Database tests
@@ -75,7 +77,7 @@ Never point it at your development database: the tests empty the tables.
 | Path | What | Like in nsms |
 |---|---|---|
 | `main.go` | Calls `cmd.Execute()` | same |
-| `cmd/` | Cobra CLI: `server`, `migrate`, `seed`, `import` | same, plus `import` |
+| `cmd/` | Cobra CLI: `server`, `migrate`, `seed`, `import`, `scores`, `admin`, `backtest` | same, plus `import` |
 | `config/` | Viper config from `config.yaml`, `TD_*` environment overrides, rule thresholds | same |
 | `api/` | Fiber app: `api.go` (wiring), `routes.go`, `middleware.go` | same |
 | `api/<area>/` | Handlers per area: `leagues`, `tickets`, `wizard`, `results`, `admin` | same pattern |

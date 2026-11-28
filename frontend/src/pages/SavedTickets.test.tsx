@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import App from '../App'
 import { FIXTURES } from '../mocks/data'
-import { DEMO_SAVED_ID, DEMO_TICKET_ID, resetSavedMock } from '../mocks/saved'
+import { awaitingResult } from '../api/hooks'
+import type { SavedLeg } from '../api/types'
+import { DEMO_LIVE_ID, DEMO_SAVED_ID, DEMO_TICKET_ID, resetSavedMock } from '../mocks/saved'
 import { loadSaved, rememberSaved } from '../lib/savedStore'
 import { TicketProvider } from '../state/TicketContext'
 import { TICKET_STORAGE_KEY, type TicketState } from '../state/ticketReducer'
@@ -91,6 +93,31 @@ describe('Saved tickets (V2, FR-9)', () => {
     expect(screen.queryByRole('button', { name: 'Delete saved ticket' })).not.toBeInTheDocument()
     expect(screen.getByText('Only the device that saved this ticket can delete it.')).toBeInTheDocument()
     expect(screen.getByText(/Kept until/)).toBeInTheDocument()
+  })
+
+  it('says when a game has kicked off and when results were last checked (A10)', async () => {
+    renderAt(`/t/${DEMO_LIVE_ID}`)
+    const [a, b, c] = FIXTURES
+    const played = await screen.findByRole('article', { name: `${a.home.name} v ${a.away.name}` })
+    expect(within(played).getByText('2–0')).toBeInTheDocument()
+    const live = screen.getByRole('article', { name: `${b.home.name} v ${b.away.name}` })
+    expect(within(live).getByText('Kicked off, result soon')).toBeInTheDocument()
+    const toCome = screen.getByRole('article', { name: `${c.home.name} v ${c.away.name}` })
+    expect(within(toCome).queryByText('Kicked off, result soon')).not.toBeInTheDocument()
+
+    const result = screen.getByRole('region', { name: 'Ticket result' })
+    expect(result).toHaveTextContent('1 of 3 games played')
+    expect(result).toHaveTextContent(/15 to 30 minutes after full time.*Results last checked at \d/)
+  })
+
+  it('only looks again for games that have kicked off and are not postponed', () => {
+    const now = Date.parse('2026-11-28T17:00:00Z')
+    const leg = (kickoff: string, over: Partial<SavedLeg> = {}) =>
+      ({ fixture: { kickoff }, match_status: 'scheduled', score: null, ...over }) as SavedLeg
+    expect(awaitingResult(leg('2026-11-28T15:00:00Z'), now)).toBe(true)
+    expect(awaitingResult(leg('2026-11-28T19:00:00Z'), now)).toBe(false)
+    expect(awaitingResult(leg('2026-11-28T15:00:00Z', { match_status: 'postponed' }), now)).toBe(false)
+    expect(awaitingResult(leg('2026-11-28T15:00:00Z', { match_status: 'finished', score: { home: 1, away: 0 } }), now)).toBe(false)
   })
 
   it('lists this device’s tickets with a personal record, forgets ones that are gone, and deletes', async () => {

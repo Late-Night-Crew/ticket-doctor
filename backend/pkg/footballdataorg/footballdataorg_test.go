@@ -45,6 +45,45 @@ func TestParseRealResponse(t *testing.T) {
 			t.Errorf("fixture %d (%s) status = %q, want %q", i, got[i].APIStatus, got[i].Status, wantStatus)
 		}
 	}
+	// Only the finished game has a score.
+	for i, f := range got[:3] {
+		if f.Score != nil {
+			t.Errorf("fixture %d (%s) has a score %+v", i, f.APIStatus, *f.Score)
+		}
+	}
+	if s := got[3].Score; s == nil || *s != (Score{Home: 2, Away: 1}) {
+		t.Errorf("finished fixture score = %+v, want 2-1", s)
+	}
+}
+
+func TestParseScoreOnlyForNormalTime(t *testing.T) {
+	match := func(status, duration, home, away string) string {
+		return `{"matches":[{"id":1,"utcDate":"2026-11-28T15:00:00Z","status":"` + status + `",
+			"season":{"startDate":"2026-08-21"},"homeTeam":{"name":"A"},"awayTeam":{"name":"B"},
+			"score":{"duration":"` + duration + `","fullTime":{"home":` + home + `,"away":` + away + `}}}]}`
+	}
+	for _, tc := range []struct {
+		name, body string
+		want       *Score
+	}{
+		{"finished", match("FINISHED", "REGULAR", "0", "0"), &Score{0, 0}},
+		{"awarded", match("AWARDED", "REGULAR", "3", "0"), &Score{3, 0}},
+		{"in play: the score isn't final", match("IN_PLAY", "REGULAR", "1", "0"), nil},
+		{"half time", match("PAUSED", "REGULAR", "1", "0"), nil},
+		{"extra time: bets settle on 90 minutes", match("FINISHED", "EXTRA_TIME", "2", "1"), nil},
+		{"penalties", match("FINISHED", "PENALTY_SHOOTOUT", "5", "4"), nil},
+		{"finished without a score yet", match("FINISHED", "REGULAR", "null", "null"), nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := Parse(strings.NewReader(tc.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s := got[0].Score; (s == nil) != (tc.want == nil) || (s != nil && *s != *tc.want) {
+				t.Fatalf("score = %+v, want %+v", s, tc.want)
+			}
+		})
+	}
 }
 
 func TestParseRejectsSurprises(t *testing.T) {

@@ -68,7 +68,11 @@ type LeagueImport struct {
 	SkippedRows   int      `json:"skipped_rows"`
 	SkippedSample []string `json:"skipped_sample,omitempty"`
 	NewTeams      []string `json:"new_teams,omitempty"`
-	Profiles      int      `json:"profiles"`
+	// Corrected lists games where the results file changed a score that came
+	// from football-data.org or an admin, e.g. "Arsenal v Chelsea 2-1 → 2-2
+	// (was football-data.org)". The file wins (addendum A10).
+	Corrected []string `json:"corrected,omitempty"`
+	Profiles  int      `json:"profiles"`
 	// LowConfidence lists teams with a home or away profile below the cut-off.
 	LowConfidence []string `json:"low_confidence,omitempty"`
 	// Fixtures is nil when fixtures weren't imported.
@@ -86,6 +90,9 @@ type FixtureImport struct {
 	Postponed int `json:"postponed"`
 	// Played counts games in play or finished, left to the results import.
 	Played int `json:"played"`
+	// Results counts finished games given football-data.org's score because
+	// the results file doesn't have them yet (addendum A10).
+	Results int `json:"results"`
 	// Unmatched lists club names that matched no team. Those fixtures are
 	// skipped; fix them with an alias in pkg/teamnames.
 	Unmatched []string `json:"unmatched,omitempty"`
@@ -143,7 +150,7 @@ func (s *ImportService) Run(ctx context.Context, opts ImportOptions) (*ImportSum
 		return nil, err
 	}
 
-	runID, err := s.q.StartImportRun(ctx)
+	runID, err := s.q.StartImportRun(ctx, "import")
 	if err != nil {
 		return nil, fmt.Errorf("record import run: %w", err)
 	}
@@ -250,6 +257,10 @@ func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, opts 
 		if err != nil {
 			return err
 		}
+		provisional, err := provisionalResults(ctx, q, l.ID)
+		if err != nil {
+			return err
+		}
 		for _, sd := range data {
 			for _, m := range sd.matches {
 				if m.Division != *l.FdCode {
@@ -264,6 +275,10 @@ func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, opts 
 					return err
 				}
 				hg, ag := int16(m.HomeGoals), int16(m.AwayGoals)
+				if p, ok := provisional[matchKey{sd.season, home, away}]; ok && (p.home != hg || p.away != ag) {
+					li.Corrected = append(li.Corrected, fmt.Sprintf("%s v %s %d-%d → %d-%d (was %s)",
+						m.HomeTeam, m.AwayTeam, p.home, p.away, hg, ag, p.source))
+				}
 				row, err := q.UpsertMatch(ctx, dbsqlc.UpsertMatchParams{
 					LeagueID: l.ID, Season: sd.season, Kickoff: m.Kickoff,
 					HomeTeamID: home, AwayTeamID: away, Status: "finished",
@@ -297,7 +312,7 @@ func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, opts 
 	})
 	if err != nil {
 		// The transaction rolled back: nothing from this league was saved.
-		li.Inserted, li.Updated, li.Unchanged, li.NewTeams, li.Profiles, li.LowConfidence = 0, 0, 0, nil, 0, nil
+		li.Inserted, li.Updated, li.Unchanged, li.NewTeams, li.Profiles, li.LowConfidence, li.Corrected = 0, 0, 0, nil, 0, nil, nil
 		if li.Fixtures != nil {
 			li.Fixtures = &FixtureImport{Rows: li.Fixtures.Rows, Error: li.Fixtures.Error}
 		}
@@ -306,11 +321,11 @@ func (s *ImportService) importLeague(ctx context.Context, l dbsqlc.League, opts 
 	s.logger.Info("league imported", loggedmodule.Attr(loggedmodule.Import),
 		"league", l.ID, "rows", li.Rows, "inserted", li.Inserted, "updated", li.Updated,
 		"unchanged", li.Unchanged, "skipped_rows", li.SkippedRows, "new_teams", len(li.NewTeams),
-		"profiles", li.Profiles, "low_confidence_teams", len(li.LowConfidence))
+		"profiles", li.Profiles, "low_confidence_teams", len(li.LowConfidence), "corrected", li.Corrected)
 	if fx := li.Fixtures; fx != nil {
 		s.logger.Info("fixtures imported", loggedmodule.Attr(loggedmodule.Import),
 			"league", l.ID, "rows", fx.Rows, "inserted", fx.Inserted, "updated", fx.Updated,
-			"unchanged", fx.Unchanged, "postponed", fx.Postponed, "played", fx.Played, "unmatched", fx.Unmatched)
+			"unchanged", fx.Unchanged, "postponed", fx.Postponed, "played", fx.Played, "results", fx.Results, "unmatched", fx.Unmatched)
 	}
 	switch {
 	case fixturesErr != nil:
@@ -333,6 +348,15 @@ func (s *ImportService) saveFixtures(ctx context.Context, q *dbsqlc.Queries, lea
 	for _, f := range fixtures {
 		if f.Status == footballdataorg.Skip {
 			fx.Played++
+			// A finished game the results file hasn't got yet: use this score
+			// until it arrives. Runs after the results, so it never replaces one.
+			saved, err := saveScore(ctx, q, league, teams, f)
+			if err != nil {
+				return err
+			}
+			if saved {
+				fx.Results++
+			}
 			continue
 		}
 		home, okHome := teams.find(f.Home.Name, f.Home.ShortName)
@@ -370,6 +394,56 @@ func (s *ImportService) saveFixtures(ctx context.Context, q *dbsqlc.Queries, lea
 	}
 	sort.Strings(fx.Unmatched)
 	return nil
+}
+
+// saveScore stores a finished fixture's full-time score if the game has no
+// result yet. It reports false, without an error, for a fixture with no score
+// or with a club it can't match (the fixtures import reports those).
+func saveScore(ctx context.Context, q *dbsqlc.Queries, league string, teams *teamResolver, f footballdataorg.Fixture) (bool, error) {
+	if f.Score == nil {
+		return false, nil
+	}
+	home, okHome := teams.find(f.Home.Name, f.Home.ShortName)
+	away, okAway := teams.find(f.Away.Name, f.Away.ShortName)
+	if !okHome || !okAway {
+		return false, nil
+	}
+	hg, ag := int16(f.Score.Home), int16(f.Score.Away)
+	_, err := q.SetQuickResult(ctx, dbsqlc.SetQuickResultParams{
+		HomeGoals: &hg, AwayGoals: &ag, Kickoff: f.Kickoff,
+		LeagueID: league, Season: f.Season, HomeTeamID: home, AwayTeamID: away,
+	})
+	switch {
+	case errors.Is(err, pgx.ErrNoRows): // already has a result, or not in our data
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("save score %s v %s (%d): %w", f.Home.Name, f.Away.Name, f.ID, err)
+	}
+	return true, nil
+}
+
+type matchKey struct {
+	season     string
+	home, away int64
+}
+
+type provisionalResult struct {
+	home, away int16
+	source     string
+}
+
+// provisionalResults are a league's finished games whose score didn't come
+// from the results file.
+func provisionalResults(ctx context.Context, q *dbsqlc.Queries, league string) (map[matchKey]provisionalResult, error) {
+	rows, err := q.ListProvisionalResults(ctx, league)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[matchKey]provisionalResult, len(rows))
+	for _, r := range rows {
+		out[matchKey{r.Season, r.HomeTeamID, r.AwayTeamID}] = provisionalResult{*r.HomeGoals, *r.AwayGoals, r.Source}
+	}
+	return out, nil
 }
 
 // rebuildProfiles recomputes every team's home and away profile and last-5

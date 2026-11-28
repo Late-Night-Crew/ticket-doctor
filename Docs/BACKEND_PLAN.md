@@ -199,7 +199,7 @@ Each milestone ends with green CI and a pull request.
   - Changes must be sent as JSON, which stops cross-site forms.
   - In production, admin is off until the secret is set.
 - **Endpoints (`/api/admin`):** `login`, `logout`, `me`, `dashboard`, `matches?view=awaiting|recent`, `PUT matches/:id/result`, `thresholds`.
-- **Manual results (FR-1.4):** only for games that have kicked off. The score is stored with `source = manual`, and each entry, with the score it replaced, is kept in `result_entries`. The results import still wins for leagues it covers. Team profiles pick the result up at the next import.
+- **Manual results (FR-1.4):** only for games that have kicked off. The score is stored with `source = manual`, and each entry, with the score it replaced, is kept in `result_entries`. The results import still wins for leagues it covers. Team profiles pick the result up at the next import. Since A10, football-data.org scores usually fill a result in first, within about 30 minutes on match days.
 - **Thresholds:** read-only, showing each value with its SRS default. They change in config and ship with a release (NFR-6), so every change is reviewed.
 
 **Calibration** (2026-11-28): checks whether the estimates are right, before spending on data or models.

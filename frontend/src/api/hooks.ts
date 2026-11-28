@@ -8,6 +8,7 @@ import type {
   FixtureWindow,
   League,
   ResultsResponse,
+  SavedLeg,
   SavedTicket,
   WizardRequest,
   WizardResponse,
@@ -90,6 +91,13 @@ export function useSaveTicket() {
   })
 }
 
+/** A game that has kicked off but has no result yet: its score could arrive any minute. */
+export const awaitingResult = (l: SavedLeg, now = Date.now()) =>
+  !l.score && l.match_status !== 'postponed' && new Date(l.fixture.kickoff).getTime() <= now
+
+/** How often an open saved ticket looks again while a game awaits its result (A10). */
+export const SAVED_POLL_MS = 2 * 60 * 1000
+
 export function useSavedTicket(id: string | undefined) {
   return useQuery({
     queryKey: ['saved', id],
@@ -97,6 +105,8 @@ export function useSavedTicket(id: string | undefined) {
     enabled: !!id,
     retry: false,
     staleTime: 5 * 60 * 1000,
+    // Scores arrive every 15 minutes on match days: look again while one is due.
+    refetchInterval: (q) => (q.state.data?.legs?.some((l) => awaitingResult(l)) ? SAVED_POLL_MS : false),
   })
 }
 
@@ -106,6 +116,8 @@ export function useSavedList(ids: string[]) {
     queryFn: () => api<SavedTicket[]>(`/saved?ids=${ids.map(encodeURIComponent).join(',')}`),
     enabled: ids.length > 0,
     staleTime: 5 * 60 * 1000,
+    // Lists carry no legs, so poll more gently while any ticket is still open.
+    refetchInterval: (q) => (q.state.data?.some((t) => t.status === 'pending') ? 5 * 60 * 1000 : false),
   })
 }
 

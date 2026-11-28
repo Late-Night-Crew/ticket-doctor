@@ -115,6 +115,16 @@ Agreed 2026-11-28, for people who chase cash-outs.
 - The app never suggests whether to cash out.
 - Legs are treated as independent, as in the combined chance.
 
+### A10. Quick results on match days (adds to FR-1.1 and FR-9)
+
+Agreed 2026-11-28. The results file (football-data.co.uk) posts results a day or more after the games, so saved tickets waited that long to settle.
+
+- **Source.** football-data.org, which we already use for fixtures, also gives the full-time score of finished games. We use it only for games decided in normal time, because bets settle on 90 minutes. Games that go to extra time or penalties wait for the results file.
+- **When.** The twice-daily import now saves these scores too. On match days, a light check (`ticketdoctor scores`) also runs every 15 minutes: weekends 11:00–23:45 UTC, and Monday to Friday 17:00–23:45 UTC, which covers Friday evenings. It only asks about games that kicked off between 36 hours and 100 minutes ago with no result yet, at most one request per league. With none, it makes no request.
+- **Which source wins.** The results file still wins, as before (it also brings the odds). It replaces a football-data.org score, or a score entered by hand, when it arrives. The dashboard lists any score it changed. A football-data.org score never replaces an existing result.
+- **On a saved ticket.** A game that has kicked off with no result shows "Kicked off, result soon", and the page shows when results were last checked. While a game is awaiting its result, the page checks again every 2 minutes, and My tickets every 5.
+- **Not included.** Live scores during the game: the free plan's in-play scores lag or are missing.
+
 ---
 
 ## B. Version 2: saved tickets and pick comparison

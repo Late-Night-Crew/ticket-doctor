@@ -295,6 +295,19 @@ func (q *Queries) DeleteLegSuggestions(ctx context.Context, analysedLegID int64)
 	return err
 }
 
+const deleteOldScoreRuns = `-- name: DeleteOldScoreRuns :execrows
+DELETE FROM import_runs WHERE kind = 'scores' AND started_at < $1::timestamptz
+`
+
+// Quick score checks run often; a fortnight of them is plenty.
+func (q *Queries) DeleteOldScoreRuns(ctx context.Context, before time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOldScoreRuns, before)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteSaved = `-- name: DeleteSaved :execrows
 DELETE FROM saved_tickets WHERE id = $1 AND ticket_id = $2
 `
@@ -606,6 +619,20 @@ func (q *Queries) InsertTicketLeg(ctx context.Context, arg InsertTicketLegParams
 	return id, err
 }
 
+const lastResultsCheck = `-- name: LastResultsCheck :one
+SELECT finished_at FROM import_runs
+WHERE status = 'succeeded' AND finished_at IS NOT NULL
+ORDER BY finished_at DESC LIMIT 1
+`
+
+// When results were last looked for, by a full import or a quick score check.
+func (q *Queries) LastResultsCheck(ctx context.Context) (*time.Time, error) {
+	row := q.db.QueryRow(ctx, lastResultsCheck)
+	var finished_at *time.Time
+	err := row.Scan(&finished_at)
+	return finished_at, err
+}
+
 const lastSuccessfulImport = `-- name: LastSuccessfulImport :one
 SELECT finished_at FROM import_runs
 WHERE status = 'succeeded' AND finished_at IS NOT NULL
@@ -676,6 +703,48 @@ func (q *Queries) ListAdminMatches(ctx context.Context, arg ListAdminMatchesPara
 			&i.HomeName,
 			&i.AwayName,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAwaitingScoreLeagues = `-- name: ListAwaitingScoreLeagues :many
+SELECT l.id, l.fdo_code::text AS fdo_code, min(m.kickoff)::timestamptz AS earliest
+FROM matches m JOIN leagues l ON l.id = m.league_id
+WHERE m.status IN ('scheduled', 'postponed') AND l.fdo_code IS NOT NULL
+  AND m.kickoff >= $1::timestamptz AND m.kickoff < $2::timestamptz
+GROUP BY l.id, l.fdo_code
+ORDER BY l.id
+`
+
+type ListAwaitingScoreLeaguesParams struct {
+	FromTime time.Time
+	ToTime   time.Time
+}
+
+type ListAwaitingScoreLeaguesRow struct {
+	ID       string
+	FdoCode  string
+	Earliest time.Time
+}
+
+// Leagues with a game that kicked off in [from, to) and has no result yet,
+// with the earliest such kick-off: what a quick score check asks about.
+func (q *Queries) ListAwaitingScoreLeagues(ctx context.Context, arg ListAwaitingScoreLeaguesParams) ([]ListAwaitingScoreLeaguesRow, error) {
+	rows, err := q.db.Query(ctx, listAwaitingScoreLeagues, arg.FromTime, arg.ToTime)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAwaitingScoreLeaguesRow{}
+	for rows.Next() {
+		var i ListAwaitingScoreLeaguesRow
+		if err := rows.Scan(&i.ID, &i.FdoCode, &i.Earliest); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -841,11 +910,16 @@ func (q *Queries) ListFixtures(ctx context.Context, arg ListFixturesParams) ([]L
 }
 
 const listImportRuns = `-- name: ListImportRuns :many
-SELECT id, started_at, finished_at, status, summary, error FROM import_runs ORDER BY started_at DESC LIMIT $1
+SELECT id, started_at, finished_at, status, summary, error, kind FROM import_runs WHERE kind = $1 ORDER BY started_at DESC LIMIT $2
 `
 
-func (q *Queries) ListImportRuns(ctx context.Context, limit int32) ([]ImportRun, error) {
-	rows, err := q.db.Query(ctx, listImportRuns, limit)
+type ListImportRunsParams struct {
+	Kind  string
+	Limit int32
+}
+
+func (q *Queries) ListImportRuns(ctx context.Context, arg ListImportRunsParams) ([]ImportRun, error) {
+	rows, err := q.db.Query(ctx, listImportRuns, arg.Kind, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -860,6 +934,7 @@ func (q *Queries) ListImportRuns(ctx context.Context, limit int32) ([]ImportRun,
 			&i.Status,
 			&i.Summary,
 			&i.Error,
+			&i.Kind,
 		); err != nil {
 			return nil, err
 		}
@@ -1087,6 +1162,50 @@ func (q *Queries) ListProfilesForTeams(ctx context.Context, arg ListProfilesForT
 			&i.Over25Rate,
 			&i.Under35Rate,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProvisionalResults = `-- name: ListProvisionalResults :many
+SELECT season, home_team_id, away_team_id, home_goals, away_goals, source
+FROM matches
+WHERE league_id = $1 AND status = 'finished' AND source <> 'football-data.co.uk'
+`
+
+type ListProvisionalResultsRow struct {
+	Season     string
+	HomeTeamID int64
+	AwayTeamID int64
+	HomeGoals  *int16
+	AwayGoals  *int16
+	Source     string
+}
+
+// Finished games in a league whose result didn't come from the results file,
+// so the import can say when the file disagrees with them.
+func (q *Queries) ListProvisionalResults(ctx context.Context, leagueID string) ([]ListProvisionalResultsRow, error) {
+	rows, err := q.db.Query(ctx, listProvisionalResults, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProvisionalResultsRow{}
+	for rows.Next() {
+		var i ListProvisionalResultsRow
+		if err := rows.Scan(
+			&i.Season,
+			&i.HomeTeamID,
+			&i.AwayTeamID,
+			&i.HomeGoals,
+			&i.AwayGoals,
+			&i.Source,
 		); err != nil {
 			return nil, err
 		}
@@ -1502,6 +1621,44 @@ func (q *Queries) SetManualResult(ctx context.Context, arg SetManualResultParams
 	return err
 }
 
+const setQuickResult = `-- name: SetQuickResult :one
+UPDATE matches
+SET status = 'finished', home_goals = $1, away_goals = $2,
+    kickoff = $3, source = 'football-data.org', updated_at = now()
+WHERE league_id = $4 AND season = $5
+  AND home_team_id = $6 AND away_team_id = $7
+  AND status <> 'finished'
+RETURNING id
+`
+
+type SetQuickResultParams struct {
+	HomeGoals  *int16
+	AwayGoals  *int16
+	Kickoff    time.Time
+	LeagueID   string
+	Season     string
+	HomeTeamID int64
+	AwayTeamID int64
+}
+
+// Saves a full-time score from football-data.org (addendum A10) for a game
+// with no result yet. A finished game is never touched: the results file
+// (with odds) or an admin got there first. Returns no row when nothing changed.
+func (q *Queries) SetQuickResult(ctx context.Context, arg SetQuickResultParams) (int64, error) {
+	row := q.db.QueryRow(ctx, setQuickResult,
+		arg.HomeGoals,
+		arg.AwayGoals,
+		arg.Kickoff,
+		arg.LeagueID,
+		arg.Season,
+		arg.HomeTeamID,
+		arg.AwayTeamID,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const setUserDisabled = `-- name: SetUserDisabled :execrows
 UPDATE users SET disabled = $2 WHERE username = $1
 `
@@ -1566,12 +1723,12 @@ func (q *Queries) SnapshotLegs(ctx context.Context, arg SnapshotLegsParams) (int
 
 const startImportRun = `-- name: StartImportRun :one
 
-INSERT INTO import_runs DEFAULT VALUES RETURNING id
+INSERT INTO import_runs (kind) VALUES ($1) RETURNING id
 `
 
 // ---------- import runs ----------
-func (q *Queries) StartImportRun(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, startImportRun)
+func (q *Queries) StartImportRun(ctx context.Context, kind string) (int64, error) {
+	row := q.db.QueryRow(ctx, startImportRun, kind)
 	var id int64
 	err := row.Scan(&id)
 	return id, err

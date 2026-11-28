@@ -30,6 +30,7 @@ type ImportRun struct {
 	Status     string
 	Summary    []byte
 	Error      *string
+	Kind       string
 }
 
 type League struct {

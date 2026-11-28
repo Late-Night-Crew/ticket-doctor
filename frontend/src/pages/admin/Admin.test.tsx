@@ -72,6 +72,10 @@ describe('Admin area (B6)', () => {
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('2 games have kicked off with no result yet.')
     expect(screen.getByText('laliga: unmatched Real Oviedo')).toBeInTheDocument()
+    // Quick score checks (A10), and where the results file corrected one.
+    expect(screen.getByRole('region', { name: 'Score checks' })).toHaveTextContent('4 new full-time scores')
+    expect(screen.getByText(/Score corrected by the results file: laliga: Betis v Vallecano 0-1 → 1-1/)).toBeInTheDocument()
+    expect(screen.getByText('2 early scores from football-data.org')).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Admin' })).toBeInTheDocument()
   })
 

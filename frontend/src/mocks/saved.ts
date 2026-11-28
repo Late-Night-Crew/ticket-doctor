@@ -2,7 +2,8 @@
  * Mock saved tickets (V2), for development and tests. The mock analyser
  * records each ticket's last analysis here, and saving snapshots it. Games in
  * the mock are all in the future, so a pre-made settled ticket (DEMO_SAVED_ID)
- * shows the review screen with results.
+ * shows the review screen with results, and DEMO_LIVE_ID has a game that has
+ * kicked off and awaits its result.
  */
 import { http, HttpResponse } from 'msw'
 import type { AnalyseResponse, SavedLeg, SavedSummary, SavedTicket } from '../api/types'
@@ -11,6 +12,7 @@ import { FIXTURES } from './data'
 const API = '*/api/saved'
 export const DEMO_SAVED_ID = 'demoSettledTicket00001'
 export const DEMO_TICKET_ID = 'demo-ticket-0001'
+export const DEMO_LIVE_ID = 'demoLiveTicket00000001'
 
 const analyses = new Map<string, AnalyseResponse>()
 export const recordAnalysis = (res: AnalyseResponse) => analyses.set(res.ticket_id, res)
@@ -79,6 +81,36 @@ function demo(): SavedTicket {
     settled_at: settledAt,
     expires_at: new Date(Date.now() + 89 * 86400_000).toISOString(),
     summary: summarise(legs),
+    results_checked_at: null,
+    legs,
+  }
+}
+
+/** One game played, one kicked off half an hour ago with no result yet, one to come. */
+function live(): SavedTicket {
+  const [a, b, c] = FIXTURES
+  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+  const pick = (market: SavedLeg['final']['market'], estimate: number): Pick<SavedLeg, 'original' | 'final' | 'suggestions'> => ({
+    original: { market, estimate, risk_band: 'low', outcome: 'pending' },
+    final: { market, outcome: 'pending' },
+    suggestions: [],
+  })
+  const legs: SavedLeg[] = [
+    { fixture: { ...a, kickoff: minutesAgo(150) }, match_status: 'finished', score: { home: 2, away: 0 }, ...pick('HOME_WIN', 0.7) },
+    { fixture: { ...b, kickoff: minutesAgo(30) }, match_status: 'scheduled', score: null, ...pick('OVER_1_5', 0.8) },
+    { fixture: { ...c, kickoff: minutesAgo(-180) }, match_status: 'scheduled', score: null, ...pick('BTTS_YES', 0.6) },
+  ]
+  legs[0].original.outcome = legs[0].final.outcome = 'won'
+  return {
+    id: DEMO_LIVE_ID,
+    origin: 'wizard',
+    created_at: minutesAgo(240),
+    updated_at: minutesAgo(240),
+    status: 'pending',
+    settled_at: null,
+    expires_at: null,
+    summary: summarise(legs),
+    results_checked_at: minutesAgo(4),
     legs,
   }
 }
@@ -88,6 +120,7 @@ export function resetSavedMock() {
   analyses.clear()
   saved.clear()
   saved.set(DEMO_SAVED_ID, { ticketId: DEMO_TICKET_ID, ticket: demo() })
+  saved.set(DEMO_LIVE_ID, { ticketId: 'demo-ticket-0002', ticket: live() })
 }
 resetSavedMock()
 
@@ -122,6 +155,7 @@ export const savedHandlers = [
       settled_at: null,
       expires_at: null,
       summary: summarise(legs),
+      results_checked_at: new Date(Date.now() - 5 * 60_000).toISOString(),
       legs,
     }
     saved.set(id, { ticketId: ticket_id, ticket })

@@ -11,6 +11,7 @@ Everything runs on Render's free plan, in Frankfurt (the closest region to Malaw
 GitHub does the rest:
 - **Release workflow:** deploys each version tag ([RELEASING.md](../RELEASING.md)).
 - **Import workflow:** loads results and fixtures twice a day ([`import.yml`](../.github/workflows/import.yml)).
+- **Scores workflow:** every 15 minutes on match days, saves full-time scores for games just played so saved tickets settle quickly ([`scores.yml`](../.github/workflows/scores.yml), addendum A10). It uses the same secrets as Import.
 
 Secrets never go in the repository, in chat or in commit messages. Store them in GitHub's encrypted secrets, as below.
 
@@ -135,7 +136,8 @@ unset TD_DATABASE_URL
 | Release | Tag on `main` ([RELEASING.md](../RELEASING.md)); the Release workflow deploys it |
 | Roll back | Actions → Release → Run workflow → the previous tag |
 | Import now | Actions → Import → Run workflow |
+| Check scores now | Actions → Scores → Run workflow (does nothing if no game is awaiting a result) |
 | Logs | Render → `ticket-doctor-api` → Logs (JSON, one line per request) |
 | Is it up? | `https://ticket-doctor.onrender.com/api/health` shows the running version |
-| Enter a missing result | `/admin` → Results (the next import replaces it if its file has the game) |
+| Enter a missing result | `/admin` → Results (the next import replaces it if its file has the game). Usually unnecessary now: score checks fill results in within about 30 minutes |
 | Free hours | All free web services in the workspace share 750 hours a month (sleeping ones use none). If they run out, Render suspends them until the 1st |
