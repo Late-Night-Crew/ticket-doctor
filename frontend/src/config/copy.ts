@@ -146,6 +146,27 @@ export const COPY = {
     removeLeg: (pick: string) => `Remove leg: ${pick}`,
   },
 
+  howFar: {
+    title: 'How far will it get?',
+    lead: 'Your games in kick-off order. Every leg must win, so the chance your ticket is still alive drops with each game.',
+    stillAlive: 'still alive',
+    sameTime: 'same kick-off as the game above',
+    likeliestEnd: 'most likely to end it',
+    cashOutLabel: 'Cash out with',
+    gamesLeft: (n: number) => `${n} game${n === 1 ? '' : 's'} left`,
+    reach: (before: number, left: number) =>
+      `Chance the first ${before} game${before === 1 ? '' : 's'} all win, so you reach the last ${left} still alive:`,
+    average: (games: string, of: number) => `On average, a ticket like this gets through ${games} of its ${of} games.`,
+    riskyEarly: (pick: string) =>
+      `Your riskiest leg, ${pick}, kicks off early. If you are hoping to reach a cash-out, a risky leg hurts least when it kicks off last.`,
+    cashOutNote:
+      'We cannot see cash-out offers. Bookmakers set them, usually below what the ticket is worth, and we do not suggest whether to cash out.',
+    expected: (games: string, of: number) => `We expected it to get through about ${games} of ${of} games.`,
+    gotThrough: (n: number) => `It got through ${n} before one lost.`,
+    allWon: 'Every game won.',
+    soFar: (n: number) => `${n} won so far.`,
+  },
+
   saved: {
     // Analysis screen
     saveTitle: 'Save this ticket',

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { ApiError } from '../api/client'
 import { useAcceptSuggestion, useAnalysis } from '../api/hooks'
 import type { AnalyseRequest, AnalysedLeg, Suggestion } from '../api/types'
+import { HowFarCard } from '../components/analysis/HowFarCard'
 import { SwapOption } from '../components/analysis/SwapOption'
 import { TicketSummary } from '../components/analysis/TicketSummary'
 import { PageSpinner } from '../components/AppLayout'
@@ -133,6 +134,8 @@ export default function Analysis() {
                 />
               ))}
             </div>
+
+            <HowFarCard legs={analysis.data.legs} />
 
             <div className="d-flex flex-wrap gap-2 mt-4">
               <Link to="/ticket" className="btn btn-outline-primary">

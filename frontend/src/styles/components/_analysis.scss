@@ -71,3 +71,63 @@
   outline: 3px solid var(--td-brand);
   outline-offset: 2px;
 }
+
+// "How far will it get?": survival by kick-off
+.td-howfar {
+  display: grid;
+  gap: 0.5rem;
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+    gap: 0.5rem 0.75rem;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--td-line);
+
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  // The games left at the chosen cash-out point.
+  &__row--late &__pos {
+    background: var(--td-brand-soft);
+    color: var(--td-brand);
+  }
+
+  &__pos {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    background: var(--td-surface-2);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  &__bar {
+    height: 6px;
+    margin-top: 0.35rem;
+    border-radius: 3px;
+    background: var(--td-surface-2);
+    overflow: hidden;
+
+    span {
+      display: block;
+      height: 100%;
+      border-radius: 3px;
+      background: var(--td-brand);
+    }
+  }
+
+  &__alive {
+    min-width: 4.5rem;
+  }
+
+  &__cashout {
+    border-radius: var(--bs-border-radius);
+    background: var(--td-surface-2);
+  }
+}

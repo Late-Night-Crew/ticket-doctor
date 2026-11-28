@@ -145,3 +145,36 @@ describe('Analysis screen (FR-4 to FR-6)', () => {
     expect(await screen.findByText('Only one leg per match.')).toBeInTheDocument()
   })
 })
+
+describe('How far will it get? (cash-out view)', () => {
+  it('orders games by kick-off, shows the chance still alive, and answers for a cash-out point', async () => {
+    const legs = [...FIXTURES].slice(0, 3).reverse() // deliberately not in kick-off order
+    seed(legs.map((fixture) => ({ fixture, market: 'OVER_1_5' as MarketKey })))
+    const user = userEvent.setup()
+    renderAnalysis()
+
+    const card = await screen.findByRole('region', { name: 'How far will it get?' })
+    const rows = within(card).getAllByRole('listitem')
+    expect(rows).toHaveLength(3)
+    // Kick-off order, earliest first.
+    const kickoffs = [...legs].sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff))
+    rows.forEach((row, i) => expect(row).toHaveTextContent(kickoffs[i].home.name))
+    // "Still alive" only ever goes down.
+    const alive = rows.map((r) => Number(r.querySelector('.td-howfar__alive .fw-bold')!.textContent!.replace('%', '')))
+    expect(alive).toEqual([...alive].sort((a, b) => b - a))
+
+    await user.selectOptions(within(card).getByLabelText('Cash out with'), '1 game left')
+    const answer = within(card).getByRole('status')
+    expect(answer).toHaveTextContent('Chance the first 2 games all win, so you reach the last 1 still alive:')
+    expect(answer).toHaveTextContent(`${alive[1]}%`)
+    // Never money, never advice on whether to cash out.
+    expect(card).toHaveTextContent('we do not suggest whether to cash out')
+  })
+
+  it('is not shown for one or two legs', async () => {
+    seed(FIXTURES.slice(0, 2).map((fixture) => ({ fixture, market: 'OVER_1_5' as MarketKey })))
+    renderAnalysis()
+    await screen.findAllByRole('article')
+    expect(screen.queryByRole('region', { name: 'How far will it get?' })).not.toBeInTheDocument()
+  })
+})
