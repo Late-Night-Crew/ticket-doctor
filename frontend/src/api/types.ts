@@ -234,6 +234,8 @@ export interface SavedTicket {
   /** When it will be deleted (90 days after settling); null until settled. */
   expires_at: string | null
   summary: SavedSummary
+  /** When results were last looked for (every 15 minutes on match days); null once settled. */
+  results_checked_at: string | null
   /** Only on a single ticket, not in lists. */
   legs?: SavedLeg[]
 }

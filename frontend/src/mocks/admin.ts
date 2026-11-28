@@ -110,7 +110,10 @@ export const adminHandlers = [
       suggestions: { shown: 121, accepted: 38 },
       imports: [
         { id: '12', started_at: hoursAgo(5), finished_at: hoursAgo(4.98), status: 'succeeded', error: null, summary: { leagues: [{ league: 'epl', inserted: 3, updated: 1, fixtures: { inserted: 2, updated: 4 } }] } },
-        { id: '11', started_at: hoursAgo(23), finished_at: hoursAgo(22.98), status: 'succeeded', error: null, summary: { leagues: [{ league: 'laliga', inserted: 0, updated: 0, fixtures: { inserted: 0, updated: 1, unmatched: ['Real Oviedo'] } }] } },
+        { id: '11', started_at: hoursAgo(23), finished_at: hoursAgo(22.98), status: 'succeeded', error: null, summary: { leagues: [{ league: 'laliga', inserted: 0, updated: 0, corrected: ['Betis v Vallecano 0-1 → 1-1 (was football-data.org)'], fixtures: { inserted: 0, updated: 1, results: 2, unmatched: ['Real Oviedo'] } }] } },
+      ],
+      score_checks: [
+        { id: '14', started_at: hoursAgo(0.25), finished_at: hoursAgo(0.24), status: 'succeeded', error: null, summary: { leagues: [{ league: 'epl', results: 3 }, { league: 'bundesliga', results: 1 }] } },
       ],
     }
     return HttpResponse.json(d)

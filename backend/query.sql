@@ -53,6 +53,35 @@ WHERE (matches.kickoff, matches.status, matches.home_goals, matches.away_goals,
        EXCLUDED.odds_home, EXCLUDED.odds_draw, EXCLUDED.odds_away)
 RETURNING id, (xmax = 0)::boolean AS inserted;
 
+-- name: SetQuickResult :one
+-- Saves a full-time score from football-data.org (addendum A10) for a game
+-- with no result yet. A finished game is never touched: the results file
+-- (with odds) or an admin got there first. Returns no row when nothing changed.
+UPDATE matches
+SET status = 'finished', home_goals = sqlc.arg(home_goals), away_goals = sqlc.arg(away_goals),
+    kickoff = sqlc.arg(kickoff), source = 'football-data.org', updated_at = now()
+WHERE league_id = sqlc.arg(league_id) AND season = sqlc.arg(season)
+  AND home_team_id = sqlc.arg(home_team_id) AND away_team_id = sqlc.arg(away_team_id)
+  AND status <> 'finished'
+RETURNING id;
+
+-- name: ListAwaitingScoreLeagues :many
+-- Leagues with a game that kicked off in [from, to) and has no result yet,
+-- with the earliest such kick-off: what a quick score check asks about.
+SELECT l.id, l.fdo_code::text AS fdo_code, min(m.kickoff)::timestamptz AS earliest
+FROM matches m JOIN leagues l ON l.id = m.league_id
+WHERE m.status IN ('scheduled', 'postponed') AND l.fdo_code IS NOT NULL
+  AND m.kickoff >= sqlc.arg(from_time)::timestamptz AND m.kickoff < sqlc.arg(to_time)::timestamptz
+GROUP BY l.id, l.fdo_code
+ORDER BY l.id;
+
+-- name: ListProvisionalResults :many
+-- Finished games in a league whose result didn't come from the results file,
+-- so the import can say when the file disagrees with them.
+SELECT season, home_team_id, away_team_id, home_goals, away_goals, source
+FROM matches
+WHERE league_id = $1 AND status = 'finished' AND source <> 'football-data.co.uk';
+
 -- name: UpsertFixture :one
 -- Inserts an upcoming fixture, or updates its kick-off or status. A finished
 -- match is never touched: its result comes from the results import. Returns
@@ -113,7 +142,7 @@ ORDER BY t.name, p.venue;
 -- ---------- import runs ----------
 
 -- name: StartImportRun :one
-INSERT INTO import_runs DEFAULT VALUES RETURNING id;
+INSERT INTO import_runs (kind) VALUES ($1) RETURNING id;
 
 -- name: FinishImportRun :exec
 UPDATE import_runs
@@ -302,7 +331,17 @@ SELECT
   (SELECT count(*) FROM suggestions s JOIN analysed_legs l ON l.id = s.analysed_leg_id WHERE l.on_ticket AND s.accepted) AS accepted;
 
 -- name: ListImportRuns :many
-SELECT * FROM import_runs ORDER BY started_at DESC LIMIT $1;
+SELECT * FROM import_runs WHERE kind = $1 ORDER BY started_at DESC LIMIT $2;
+
+-- name: LastResultsCheck :one
+-- When results were last looked for, by a full import or a quick score check.
+SELECT finished_at FROM import_runs
+WHERE status = 'succeeded' AND finished_at IS NOT NULL
+ORDER BY finished_at DESC LIMIT 1;
+
+-- name: DeleteOldScoreRuns :execrows
+-- Quick score checks run often; a fortnight of them is plenty.
+DELETE FROM import_runs WHERE kind = 'scores' AND started_at < sqlc.arg(before)::timestamptz;
 
 -- name: CountUsers :one
 SELECT count(*) FROM users;

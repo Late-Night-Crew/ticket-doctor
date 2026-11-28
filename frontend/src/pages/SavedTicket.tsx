@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError } from '../api/client'
-import { useDeleteSaved, useSavedTicket } from '../api/hooks'
+import { awaitingResult, useDeleteSaved, useSavedTicket } from '../api/hooks'
 import type { PairCounts, SavedLeg, SavedSummary, SavedTicket as Saved } from '../api/types'
 import { PageSpinner } from '../components/AppLayout'
 import { PageHeader } from '../components/PageHeader'
@@ -13,6 +13,7 @@ import { kickoffLabel, pct } from '../lib/format'
 import { forgetSaved, ownerOf } from '../lib/savedStore'
 import { byKickoff, expectedGamesSurvived, gamesSurvived, survival } from '../lib/survival'
 
+const clock = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
 /** A saved ticket, leg by leg: your pick, our suggestions, your final pick, and how each did (FR-9.5 to 9.7). */
@@ -52,7 +53,7 @@ export default function SavedTicket() {
       <div className="row g-4">
         <div className="col-12 col-lg-5 order-lg-2">
           <div className="td-sticky d-grid gap-3">
-            <TicketOutcomes summary={t.summary} legs={t.legs ?? []} />
+            <TicketOutcomes summary={t.summary} legs={t.legs ?? []} checkedAt={t.results_checked_at} />
             <Pairs pairs={t.summary.pairs} anySuggestions={(t.legs ?? []).some((l) => l.suggestions.length > 0)} />
             <Manage ticket={t} />
           </div>
@@ -95,7 +96,7 @@ function HowFarResult({ legs }: { legs: SavedLeg[] }) {
   )
 }
 
-function TicketOutcomes({ summary: s, legs }: { summary: SavedSummary; legs: SavedLeg[] }) {
+function TicketOutcomes({ summary: s, legs, checkedAt }: { summary: SavedSummary; legs: SavedLeg[]; checkedAt: string | null }) {
   const c = COPY.saved
   return (
     <section className="td-surface p-3" aria-label="Ticket result">
@@ -111,7 +112,12 @@ function TicketOutcomes({ summary: s, legs }: { summary: SavedSummary; legs: Sav
         </dd>
       </dl>
       <HowFarResult legs={legs} />
-      {s.settled < s.legs && <p className="small text-body-secondary mt-2 mb-0">{c.pendingNote}</p>}
+      {s.settled < s.legs && (
+        <p className="small text-body-secondary mt-2 mb-0">
+          {c.pendingNote}
+          {checkedAt && <> {c.checkedAt(clock(checkedAt))}</>}
+        </p>
+      )}
     </section>
   )
 }
@@ -203,6 +209,8 @@ function LegReview({ leg }: { leg: SavedLeg }) {
             </span>
           ) : leg.match_status === 'postponed' ? (
             c.postponed
+          ) : awaitingResult(leg) ? (
+            c.awaitingResult
           ) : (
             kickoffLabel(leg.fixture.kickoff)
           )}

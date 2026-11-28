@@ -103,6 +103,9 @@ type SavedTicket struct {
 	// ExpiresAt is when the ticket will be deleted; null until it settles.
 	ExpiresAt *time.Time   `json:"expires_at"`
 	Summary   SavedSummary `json:"summary"`
+	// ResultsCheckedAt is when results were last looked for (a full import or a
+	// quick score check, addendum A10), for "checked 17:42". Null once settled.
+	ResultsCheckedAt *time.Time `json:"results_checked_at"`
 	// Legs are left out of list responses.
 	Legs []SavedLeg `json:"legs,omitempty"`
 }
@@ -236,6 +239,10 @@ func (s *SavedService) load(ctx context.Context, ids []string, withLegs bool) ([
 	if err != nil {
 		return nil, err
 	}
+	checked, err := s.q.LastResultsCheck(ctx)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
 	legs := map[string][]SavedLeg{}
 	for _, r := range rows {
 		l, err := savedLeg(r)
@@ -266,6 +273,8 @@ func (s *SavedService) load(ctx context.Context, ids []string, withLegs bool) ([
 			}
 			exp := at.AddDate(0, 0, SavedKeepDays)
 			st.SettledAt, st.ExpiresAt = &at, &exp
+		} else {
+			st.ResultsCheckedAt = checked
 		}
 		if withLegs {
 			st.Legs = legs[id]

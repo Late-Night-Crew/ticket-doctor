@@ -55,26 +55,35 @@ type Dashboard struct {
 		Accepted int64 `json:"accepted"`
 	} `json:"suggestions"`
 	Imports []ImportRun `json:"imports"`
+	// ScoreChecks are the latest quick score checks (addendum A10).
+	ScoreChecks []ImportRun `json:"score_checks"`
 }
 
-// Dashboard sums up the data and the last ten import runs.
+// Dashboard sums up the data, the last ten import runs and the last five
+// score checks.
 func (s *AdminService) Dashboard(ctx context.Context) (*Dashboard, error) {
 	c, err := s.q.DashboardCounts(ctx, s.now())
 	if err != nil {
 		return nil, err
 	}
-	d := &Dashboard{Imports: []ImportRun{}}
+	d := &Dashboard{Imports: []ImportRun{}, ScoreChecks: []ImportRun{}}
 	d.Matches.Upcoming, d.Matches.AwaitingResult, d.Matches.Finished = c.Upcoming, c.AwaitingResult, c.Finished
 	d.Tickets.Total, d.Tickets.LastWeek, d.Tickets.Legs = c.Tickets, c.Tickets7d, c.Legs
 	d.Suggestions.Shown, d.Suggestions.Accepted = c.Suggestions, c.Accepted
 
-	runs, err := s.q.ListImportRuns(ctx, 10)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range runs {
-		d.Imports = append(d.Imports, ImportRun{ID: r.ID, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt,
-			Status: r.Status, Summary: json.RawMessage(r.Summary), Error: r.Error})
+	for _, list := range []struct {
+		kind  string
+		limit int32
+		into  *[]ImportRun
+	}{{"import", 10, &d.Imports}, {"scores", 5, &d.ScoreChecks}} {
+		runs, err := s.q.ListImportRuns(ctx, dbsqlc.ListImportRunsParams{Kind: list.kind, Limit: list.limit})
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range runs {
+			*list.into = append(*list.into, ImportRun{ID: r.ID, StartedAt: r.StartedAt, FinishedAt: r.FinishedAt,
+				Status: r.Status, Summary: json.RawMessage(r.Summary), Error: r.Error})
+		}
 	}
 	return d, nil
 }

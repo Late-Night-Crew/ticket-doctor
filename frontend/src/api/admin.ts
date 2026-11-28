@@ -23,14 +23,22 @@ export interface ImportRun {
   error: string | null
 }
 
-/** The parts of the import summary the dashboard shows (backend services.ImportSummary). */
+/**
+ * The parts of a run summary the dashboard shows: a full import
+ * (backend services.ImportSummary) or a quick score check (services.ScoresSummary).
+ */
 export interface ImportSummary {
   leagues?: {
     league: string
-    inserted: number
-    updated: number
+    inserted?: number
+    updated?: number
+    /** Score checks: games given a full-time score. */
+    results?: number
+    unmatched?: string[]
+    /** Where the results file changed a quick or hand-entered score. */
+    corrected?: string[]
     error?: string
-    fixtures?: { inserted: number; updated: number; unmatched?: string[]; error?: string }
+    fixtures?: { inserted: number; updated: number; results?: number; unmatched?: string[]; error?: string }
   }[]
 }
 
@@ -39,6 +47,8 @@ export interface Dashboard {
   tickets: { total: number; last_7_days: number; legs: number }
   suggestions: { shown: number; accepted: number }
   imports: ImportRun[]
+  /** The latest quick score checks (every 15 minutes on match days). */
+  score_checks: ImportRun[]
 }
 
 export type MatchView = 'awaiting' | 'recent'
