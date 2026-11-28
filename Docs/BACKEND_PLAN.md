@@ -210,7 +210,13 @@ Each milestone ends with green CI and a pull request.
   - overconfident at the extremes: we said 90%+ and it happened 82%; we said under 10% and it happened 19%;
   - win markets beat guessing the league average (skill +0.03 to +0.06);
   - goals markets (BTTS, overs and unders) don't (skill −0.01 to −0.05).
-- Next step to try: pull small samples towards the league average (shrinkage), measured with the same backtest.
+- **Shrinkage experiment** (`ticketdoctor backtest --prior 0,2,4,6,8,10,15,20,30`): each team's rates are pulled towards the league's average at that venue, as if it had *m* extra average games. Results with *m* = 10:
+  - Brier 0.2153 → 0.2111;
+  - 90%+ picks happened 93% (was 82%);
+  - Low band: said 75.6%, happened 75.3% (was 76.9% vs 73.1%);
+  - markets no better than the average: 10 → 3 of 15.
+
+  The gains hold from *m* = 6 to 20. The cost: about 10% fewer legs reach the Low band. Not live yet; it needs the engine, importer and TS scorer (parity) changed together.
 
 ## 6. Decisions needed
 

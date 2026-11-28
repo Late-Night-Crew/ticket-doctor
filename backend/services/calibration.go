@@ -40,6 +40,10 @@ type CalibrationRequest struct {
 	// IncludeLowConfidence keeps estimates from profiles with too few games
 	// (backtest only; the app marks those as limited data).
 	IncludeLowConfidence bool
+	// Prior (backtest only, an experiment) pulls each team's rates towards the
+	// league's average at that venue, as if the team had Prior extra average
+	// games. 0 is the live behaviour.
+	Prior float64
 }
 
 // Bin is one slice of the reliability chart: estimates in [From, To).
@@ -166,6 +170,15 @@ func (s *CalibrationService) backtest(rows []dbsqlc.ListFinishedMatchesRow, req 
 	away := map[int64][]engine.Result{}
 	tail := func(r []engine.Result) []engine.Result { return r[max(0, len(r)-window):] }
 
+	// League averages per venue, from about a season of earlier games.
+	const leagueWindow = 380
+	lt := s.engine.Thresholds()
+	lt.FormWindow, lt.LowConfidenceBelow = leagueWindow, 1
+	leagueEng, _ := engine.New(lt)
+	leagueHome := map[string][]engine.Result{}
+	leagueAway := map[string][]engine.Result{}
+	ltail := func(r []engine.Result) []engine.Result { return r[max(0, len(r)-leagueWindow):] }
+
 	markets := engine.Markets
 	if req.Market != "" {
 		markets = []engine.Market{engine.Market(req.Market)}
@@ -177,12 +190,23 @@ func (s *CalibrationService) backtest(rows []dbsqlc.ListFinishedMatchesRow, req 
 		hg, ag := int(*r.HomeGoals), int(*r.AwayGoals)
 		hp := s.engine.BuildProfile("", engine.Home, tail(home[r.HomeTeamID]))
 		ap := s.engine.BuildProfile("", engine.Away, tail(away[r.AwayTeamID]))
+		lowConf := s.engine.LowConfidence(hp) || s.engine.LowConfidence(ap)
+		if req.Prior > 0 {
+			if lh := leagueHome[r.LeagueID]; len(lh) > 0 {
+				hp = shrink(hp, leagueEng.BuildProfile("", engine.Home, ltail(lh)), req.Prior)
+				ap = shrink(ap, leagueEng.BuildProfile("", engine.Away, ltail(leagueAway[r.LeagueID])), req.Prior)
+			}
+		}
 
 		// Record this result only after rating the match: no hindsight.
-		home[r.HomeTeamID] = append(home[r.HomeTeamID], engine.Result{Date: r.Kickoff, GoalsFor: hg, GoalsAgainst: ag})
-		away[r.AwayTeamID] = append(away[r.AwayTeamID], engine.Result{Date: r.Kickoff, GoalsFor: ag, GoalsAgainst: hg})
+		hr := engine.Result{Date: r.Kickoff, GoalsFor: hg, GoalsAgainst: ag}
+		ar := engine.Result{Date: r.Kickoff, GoalsFor: ag, GoalsAgainst: hg}
+		home[r.HomeTeamID] = append(home[r.HomeTeamID], hr)
+		away[r.AwayTeamID] = append(away[r.AwayTeamID], ar)
+		leagueHome[r.LeagueID] = append(leagueHome[r.LeagueID], hr)
+		leagueAway[r.LeagueID] = append(leagueAway[r.LeagueID], ar)
 
-		if !req.IncludeLowConfidence && (s.engine.LowConfidence(hp) || s.engine.LowConfidence(ap)) {
+		if !req.IncludeLowConfidence && lowConf {
 			skipped++
 			continue
 		}
@@ -293,3 +317,16 @@ func ratio(a float64, n int) float64 {
 }
 
 func round4(v float64) float64 { return math.Round(v*1e4) / 1e4 }
+
+// shrink pulls a team profile's rates towards the league's, weighting the
+// league as prior extra games: (rate·n + league·prior) / (n + prior). The
+// sample size is unchanged, so "limited data" still means the team's own games.
+func shrink(p, league engine.Profile, prior float64) engine.Profile {
+	n := float64(p.SampleSize)
+	mix := func(team, lg float64) float64 { return (team*n + lg*prior) / (n + prior) }
+	p.WinRate, p.DrawRate, p.LossRate = mix(p.WinRate, league.WinRate), mix(p.DrawRate, league.DrawRate), mix(p.LossRate, league.LossRate)
+	p.GoalsForAvg, p.GoalsAgainstAvg = mix(p.GoalsForAvg, league.GoalsForAvg), mix(p.GoalsAgainstAvg, league.GoalsAgainstAvg)
+	p.ScoredRate, p.CleanSheetRate, p.BTTSRate = mix(p.ScoredRate, league.ScoredRate), mix(p.CleanSheetRate, league.CleanSheetRate), mix(p.BTTSRate, league.BTTSRate)
+	p.Over15Rate, p.Over25Rate, p.Under35Rate = mix(p.Over15Rate, league.Over15Rate), mix(p.Over25Rate, league.Over25Rate), mix(p.Under35Rate, league.Under35Rate)
+	return p
+}

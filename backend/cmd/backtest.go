@@ -17,6 +17,7 @@ import (
 var backtestFlags struct {
 	league, market string
 	low            bool
+	priors         []float64
 }
 
 // backtest replays every finished match in the database, rating each from the
@@ -41,15 +42,22 @@ var backtestCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		res, err := services.NewCalibrationService(pool, eng).Calibration(ctx, services.CalibrationRequest{
-			Source: services.SourceBacktest, League: backtestFlags.league, Market: backtestFlags.market,
-			IncludeLowConfidence: backtestFlags.low,
-		})
-		if err != nil {
-			return err
+		svc := services.NewCalibrationService(pool, eng)
+		run := func(prior float64) (*services.Calibration, error) {
+			return svc.Calibration(ctx, services.CalibrationRequest{
+				Source: services.SourceBacktest, League: backtestFlags.league, Market: backtestFlags.market,
+				IncludeLowConfidence: backtestFlags.low, Prior: prior,
+			})
 		}
-		printCalibration(res)
-		return nil
+		if len(backtestFlags.priors) == 1 {
+			res, err := run(backtestFlags.priors[0])
+			if err != nil {
+				return err
+			}
+			printCalibration(res)
+			return nil
+		}
+		return comparePriors(backtestFlags.priors, run)
 	},
 }
 
@@ -86,9 +94,51 @@ func printCalibration(r *services.Calibration) {
 	fmt.Println("\nSKILL above 0 beats always predicting the market's average rate; 0 or below means the stats add nothing.")
 }
 
+// comparePriors runs the backtest once per prior and prints one line each,
+// to choose how strongly to pull team rates towards the league average.
+func comparePriors(priors []float64, run func(float64) (*services.Calibration, error)) error {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
+	fmt.Fprintln(w, "PRIOR\tBRIER\tSAID 90%+\tHAPPENED\tSAID <10%\tHAPPENED\tLOW SAID\tLOW HAPPENED\tWIN SKILL\tGOALS SKILL\tMARKETS ≤0\t")
+	for _, p := range priors {
+		r, err := run(p)
+		if err != nil {
+			return err
+		}
+		top, bottom := r.Bins[len(r.Bins)-1], r.Bins[0]
+		var low services.BandStat
+		for _, b := range r.Bands {
+			if b.Band == "low" {
+				low = b
+			}
+		}
+		var win, goals float64
+		var nWin, nGoals, losing int
+		for _, m := range r.Markets {
+			if engine.Market(m.Market).Group() == engine.GroupWins {
+				win += m.Skill
+				nWin++
+			} else {
+				goals += m.Skill
+				nGoals++
+			}
+			if m.Skill <= 0 {
+				losing++
+			}
+		}
+		pct := func(v float64) string { return fmt.Sprintf("%.1f%%", v*100) }
+		fmt.Fprintf(w, "%g\t%.4f\t%s (%d)\t%s\t%s (%d)\t%s\t%s\t%s\t%+.3f\t%+.3f\t%d/%d\t\n", p, r.Brier,
+			pct(top.Predicted), top.N, pct(top.Actual), pct(bottom.Predicted), bottom.N, pct(bottom.Actual),
+			pct(low.Predicted), pct(low.Actual), win/float64(max(1, nWin)), goals/float64(max(1, nGoals)), losing, len(r.Markets))
+	}
+	_ = w.Flush()
+	fmt.Println("\nWIN/GOALS SKILL are averages over those markets; above 0 beats guessing the league average.")
+	return nil
+}
+
 func init() {
 	backtestCmd.Flags().StringVar(&backtestFlags.league, "league", "", "only this league (epl, laliga, bundesliga)")
 	backtestCmd.Flags().StringVar(&backtestFlags.market, "market", "", "only this market, e.g. OVER_2_5")
 	backtestCmd.Flags().BoolVar(&backtestFlags.low, "include-low-confidence", false, "also rate games where a team has too few past games")
+	backtestCmd.Flags().Float64SliceVar(&backtestFlags.priors, "prior", []float64{0}, "experiment: pull team rates towards the league average by this many games; several (e.g. 0,3,5,10) compares them")
 	rootCmd.AddCommand(backtestCmd)
 }
