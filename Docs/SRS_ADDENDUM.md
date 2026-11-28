@@ -97,6 +97,23 @@ Agreed 2026-11-28 from the backtest (admin → Calibration).
 **Backtest result (1,009 games).** 90%+ estimates now happen 93% of the time. The Low band is said 75.6% against 75.3% happened. Markets no better than the average dropped from 10 to 3 of 15.
 
 **The cost.** About 10% fewer legs reach the Low band.
+### A9. How far will it get? (adds to FR-6)
+
+Agreed 2026-11-28, for people who chase cash-outs.
+
+**On the analysis screen**, for tickets of 3 or more legs:
+- the legs in kick-off order, each with the chance the ticket is still alive after it (the product of every estimate so far);
+- "Cash out with *k* games left", answered with the chance the earlier games all win;
+- the leg most likely to end the ticket;
+- the average number of games a ticket like this gets through;
+- a note when the riskiest leg kicks off early, since a risky leg hurts a cash-out least when it comes last.
+
+**On a saved ticket:** how far we expected it to get, against how far it got.
+
+**Guardrails (RG-1, RG-6).**
+- No money is ever shown. Cash-out offers are set by bookmakers, below what the ticket is worth, and the app says so.
+- The app never suggests whether to cash out.
+- Legs are treated as independent, as in the combined chance.
 
 ---
 

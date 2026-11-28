@@ -11,6 +11,7 @@ import { COPY } from '../config/copy'
 import { market } from '../config/markets'
 import { kickoffLabel, pct } from '../lib/format'
 import { forgetSaved, ownerOf } from '../lib/savedStore'
+import { byKickoff, expectedGamesSurvived, gamesSurvived, survival } from '../lib/survival'
 
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -51,7 +52,7 @@ export default function SavedTicket() {
       <div className="row g-4">
         <div className="col-12 col-lg-5 order-lg-2">
           <div className="td-sticky d-grid gap-3">
-            <TicketOutcomes summary={t.summary} />
+            <TicketOutcomes summary={t.summary} legs={t.legs ?? []} />
             <Pairs pairs={t.summary.pairs} anySuggestions={(t.legs ?? []).some((l) => l.suggestions.length > 0)} />
             <Manage ticket={t} />
           </div>
@@ -69,7 +70,32 @@ export default function SavedTicket() {
   )
 }
 
-function TicketOutcomes({ summary: s }: { summary: SavedSummary }) {
+/** The estimate behind the pick that ended up on the ticket (the accepted swap's, if any). */
+function finalEstimate(l: SavedLeg): number | undefined {
+  if (l.final.market === l.original.market) return l.original.estimate
+  return l.suggestions.find((s) => s.market === l.final.market)?.estimate
+}
+
+/** How far we expected the ticket to get, in kick-off order, against how far it got. */
+function HowFarResult({ legs }: { legs: SavedLeg[] }) {
+  const c = COPY.howFar
+  const rows = legs.flatMap((l, i) => {
+    const estimate = finalEstimate(l)
+    return estimate === undefined ? [] : [{ id: String(i), kickoff: l.fixture.kickoff, estimate, leg: l }]
+  })
+  if (legs.length < 3 || rows.length !== legs.length) return null
+  const steps = survival(rows)
+  const actual = gamesSurvived(byKickoff(rows).map((r) => r.leg.final.outcome))
+  const allWon = !actual.ended && actual.survived === legs.length
+  return (
+    <p className="small mt-2 mb-0">
+      {c.expected(expectedGamesSurvived(steps).toFixed(1), legs.length)}{' '}
+      {allWon ? c.allWon : actual.ended ? c.gotThrough(actual.survived) : c.soFar(actual.survived)}
+    </p>
+  )
+}
+
+function TicketOutcomes({ summary: s, legs }: { summary: SavedSummary; legs: SavedLeg[] }) {
   const c = COPY.saved
   return (
     <section className="td-surface p-3" aria-label="Ticket result">
@@ -84,6 +110,7 @@ function TicketOutcomes({ summary: s }: { summary: SavedSummary }) {
           <OutcomeBadge outcome={s.final_ticket} label={c.ticketOutcome[s.final_ticket]} />
         </dd>
       </dl>
+      <HowFarResult legs={legs} />
       {s.settled < s.legs && <p className="small text-body-secondary mt-2 mb-0">{c.pendingNote}</p>}
     </section>
   )
