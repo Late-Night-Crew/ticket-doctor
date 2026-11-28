@@ -202,6 +202,16 @@ Each milestone ends with green CI and a pull request.
 - **Manual results (FR-1.4):** only for games that have kicked off. The score is stored with `source = manual`, and each entry, with the score it replaced, is kept in `result_entries`. The results import still wins for leagues it covers. Team profiles pick the result up at the next import.
 - **Thresholds:** read-only, showing each value with its SRS default. They change in config and ship with a release (NFR-6), so every change is reviewed.
 
+**Calibration** (2026-11-28): checks whether the estimates are right, before spending on data or models.
+- **Backtest:** every finished match replayed in kick-off order, each rated only from earlier games. Run it with `ticketdoctor backtest` or the admin **Calibration** page.
+- **Real tickets:** the same report from the estimates people were actually shown, for their own picks or our suggestions.
+- **First backtest** (1,009 games):
+  - well calibrated from 20% to 80%;
+  - overconfident at the extremes: we said 90%+ and it happened 82%; we said under 10% and it happened 19%;
+  - win markets beat guessing the league average (skill +0.03 to +0.06);
+  - goals markets (BTTS, overs and unders) don't (skill −0.01 to −0.05).
+- Next step to try: pull small samples towards the league average (shrinkage), measured with the same backtest.
+
 ## 6. Decisions needed
 
 | # | Decision | Recommendation |

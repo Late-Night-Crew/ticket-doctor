@@ -49,7 +49,7 @@ func (a *API) routes() {
 		auth := services.NewAuthService(d.Pool, secret, time.Duration(a.cfg.Admin.SessionHours)*time.Hour, d.Now).
 			WithSetupCode(a.cfg.Admin.SetupCode)
 		adm := services.NewAdminService(d.Pool, d.Engine.Thresholds(), d.Now)
-		admin.New(auth, adm, a.cfg.IsProduction()).Register(api)
+		admin.New(auth, adm, services.NewCalibrationService(d.Pool, d.Engine), a.cfg.IsProduction()).Register(api)
 	} else {
 		admin.Disabled(api)
 	}

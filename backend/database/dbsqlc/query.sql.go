@@ -686,6 +686,53 @@ func (q *Queries) ListAdminMatches(ctx context.Context, arg ListAdminMatchesPara
 	return items, nil
 }
 
+const listFinishedMatches = `-- name: ListFinishedMatches :many
+
+SELECT league_id, kickoff, home_team_id, away_team_id, home_goals, away_goals
+FROM matches
+WHERE status = 'finished'
+  AND ($1::text IS NULL OR league_id = $1::text)
+ORDER BY kickoff, id
+`
+
+type ListFinishedMatchesRow struct {
+	LeagueID   string
+	Kickoff    time.Time
+	HomeTeamID int64
+	AwayTeamID int64
+	HomeGoals  *int16
+	AwayGoals  *int16
+}
+
+// ---------- calibration (are the estimates right?) ----------
+// Every finished match, oldest first, for the backtest.
+func (q *Queries) ListFinishedMatches(ctx context.Context, leagueID *string) ([]ListFinishedMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listFinishedMatches, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFinishedMatchesRow{}
+	for rows.Next() {
+		var i ListFinishedMatchesRow
+		if err := rows.Scan(
+			&i.LeagueID,
+			&i.Kickoff,
+			&i.HomeTeamID,
+			&i.AwayTeamID,
+			&i.HomeGoals,
+			&i.AwayGoals,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFinishedMatchesByLeague = `-- name: ListFinishedMatchesByLeague :many
 SELECT home_team_id, away_team_id, kickoff, home_goals, away_goals
 FROM matches
@@ -1110,6 +1157,98 @@ func (q *Queries) ListSavedLegs(ctx context.Context, ids []string) ([]ListSavedL
 			&i.AwayID,
 			&i.AwayName,
 			&i.AwayForm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSettledPickEstimates = `-- name: ListSettledPickEstimates :many
+SELECT m.league_id, l.original_market AS market, l.original_estimate AS estimate, l.original_band AS band,
+       m.home_goals, m.away_goals
+FROM analysed_legs l
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+  AND ($1::text IS NULL OR m.league_id = $1::text)
+`
+
+type ListSettledPickEstimatesRow struct {
+	LeagueID  string
+	Market    string
+	Estimate  float64
+	Band      string
+	HomeGoals *int16
+	AwayGoals *int16
+}
+
+// Users' own picks on finished matches, with the estimate shown at the time.
+func (q *Queries) ListSettledPickEstimates(ctx context.Context, leagueID *string) ([]ListSettledPickEstimatesRow, error) {
+	rows, err := q.db.Query(ctx, listSettledPickEstimates, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSettledPickEstimatesRow{}
+	for rows.Next() {
+		var i ListSettledPickEstimatesRow
+		if err := rows.Scan(
+			&i.LeagueID,
+			&i.Market,
+			&i.Estimate,
+			&i.Band,
+			&i.HomeGoals,
+			&i.AwayGoals,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSettledSuggestionEstimates = `-- name: ListSettledSuggestionEstimates :many
+SELECT m.league_id, s.market, s.estimate, s.risk_band AS band, m.home_goals, m.away_goals
+FROM suggestions s
+JOIN analysed_legs l ON l.id = s.analysed_leg_id
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+  AND ($1::text IS NULL OR m.league_id = $1::text)
+`
+
+type ListSettledSuggestionEstimatesRow struct {
+	LeagueID  string
+	Market    string
+	Estimate  float64
+	Band      string
+	HomeGoals *int16
+	AwayGoals *int16
+}
+
+// Suggestions shown on finished matches, with their estimates.
+func (q *Queries) ListSettledSuggestionEstimates(ctx context.Context, leagueID *string) ([]ListSettledSuggestionEstimatesRow, error) {
+	rows, err := q.db.Query(ctx, listSettledSuggestionEstimates, leagueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSettledSuggestionEstimatesRow{}
+	for rows.Next() {
+		var i ListSettledSuggestionEstimatesRow
+		if err := rows.Scan(
+			&i.LeagueID,
+			&i.Market,
+			&i.Estimate,
+			&i.Band,
+			&i.HomeGoals,
+			&i.AwayGoals,
 		); err != nil {
 			return nil, err
 		}

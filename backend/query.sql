@@ -372,3 +372,31 @@ WHERE settled_at IS NULL
 -- game cancelled for good) go after a longer one.
 DELETE FROM saved_tickets
 WHERE settled_at < sqlc.arg(settled_before)::timestamptz OR created_at < sqlc.arg(created_before)::timestamptz;
+
+-- ---------- calibration (are the estimates right?) ----------
+
+-- name: ListFinishedMatches :many
+-- Every finished match, oldest first, for the backtest.
+SELECT league_id, kickoff, home_team_id, away_team_id, home_goals, away_goals
+FROM matches
+WHERE status = 'finished'
+  AND (sqlc.narg(league_id)::text IS NULL OR league_id = sqlc.narg(league_id)::text)
+ORDER BY kickoff, id;
+
+-- name: ListSettledPickEstimates :many
+-- Users' own picks on finished matches, with the estimate shown at the time.
+SELECT m.league_id, l.original_market AS market, l.original_estimate AS estimate, l.original_band AS band,
+       m.home_goals, m.away_goals
+FROM analysed_legs l
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+  AND (sqlc.narg(league_id)::text IS NULL OR m.league_id = sqlc.narg(league_id)::text);
+
+-- name: ListSettledSuggestionEstimates :many
+-- Suggestions shown on finished matches, with their estimates.
+SELECT m.league_id, s.market, s.estimate, s.risk_band AS band, m.home_goals, m.away_goals
+FROM suggestions s
+JOIN analysed_legs l ON l.id = s.analysed_leg_id
+JOIN matches m ON m.id = l.match_id
+WHERE l.on_ticket AND m.status = 'finished'
+  AND (sqlc.narg(league_id)::text IS NULL OR m.league_id = sqlc.narg(league_id)::text);

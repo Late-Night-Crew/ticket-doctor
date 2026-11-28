@@ -35,6 +35,7 @@ The server needs the database. To run the frontend against it instead of the moc
 | `PUT /api/admin/matches/:id/result` | Enter or correct a final score (FR-1.4) |
 | `GET /api/admin/setup`, `POST /api/admin/setup` | First-admin setup: only while no account exists, and only with `TD_ADMIN_SETUP_CODE` |
 | `GET /api/admin/users`, `POST /api/admin/users`, `PUT /api/admin/users/:username/disabled` | List, add, disable or enable admins (nobody can disable themselves) |
+| `GET /api/admin/calibration?source=backtest\|tickets&league=&market=&kind=picks\|suggestions&low=1` | Are the estimates right? Reliability bins, risk bands, and per-market skill against guessing the average |
 | `PUT /api/admin/me/password` | Change your own password (ends your other sessions) |
 | `GET /api/admin/thresholds` | The rule thresholds in use, with the SRS defaults |
 
@@ -46,6 +47,8 @@ ticketdoctor admin password joseph   # new password; signs the account out every
 ticketdoctor admin disable joseph    # or enable
 ticketdoctor admin list
 ```
+
+`ticketdoctor backtest [--league epl] [--market OVER_2_5] [--include-low-confidence]` replays every finished match in kick-off order, rating each only from the games before it, and prints how the estimates compare with what happened. It only reads the database.
 
 POST requests are limited to 30 a minute per IP. Errors are problem details whose `detail` the frontend shows as is.
 

@@ -3,7 +3,7 @@
  * admin pages. The session is an HttpOnly cookie the browser sends by itself:
  * nothing here ever sees or stores the token.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, post, put } from './client'
 
 export interface Admin {
@@ -196,3 +196,48 @@ export function useChangePassword() {
 }
 
 export const MIN_PASSWORD = 12
+
+/* ---------- calibration ---------- */
+
+export type CalibrationSource = 'backtest' | 'tickets'
+
+export interface CalibrationBin {
+  from: number
+  to: number
+  n: number
+  predicted: number
+  actual: number
+}
+
+export interface Calibration {
+  source: CalibrationSource
+  n: number
+  matches: number
+  skipped_low_confidence: number
+  brier: number
+  bins: CalibrationBin[]
+  bands: { band: 'low' | 'medium' | 'high'; n: number; predicted: number; actual: number }[]
+  markets: { market: string; n: number; predicted: number; actual: number; brier: number; base_brier: number; skill: number }[]
+}
+
+export interface CalibrationQuery {
+  source: CalibrationSource
+  league: string
+  market: string
+  kind: 'picks' | 'suggestions'
+  low: boolean
+}
+
+export function useCalibration(q: CalibrationQuery) {
+  const p = new URLSearchParams({ source: q.source })
+  if (q.league) p.set('league', q.league)
+  if (q.market) p.set('market', q.market)
+  if (q.source === 'tickets') p.set('kind', q.kind)
+  if (q.source === 'backtest' && q.low) p.set('low', '1')
+  return useQuery({
+    queryKey: ['admin', 'calibration', p.toString()],
+    queryFn: () => api<Calibration>(`/admin/calibration?${p}`),
+    placeholderData: keepPreviousData,
+    staleTime: 10 * 60 * 1000,
+  })
+}
