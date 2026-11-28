@@ -23,6 +23,32 @@ export interface TeamProfile {
   over15_rate: number
   over25_rate: number
   under35_rate: number
+  /** The league's average at this venue; estimates pull towards it (RULES.priorGames). */
+  league?: LeagueRates
+}
+
+/** The rates a league average provides. */
+export type LeagueRates = Pick<
+  TeamProfile,
+  'win_rate' | 'draw_rate' | 'loss_rate' | 'scored_rate' | 'clean_sheet_rate' | 'btts_rate' | 'over15_rate' | 'over25_rate' | 'under35_rate'
+>
+
+const RATE_KEYS = [
+  'win_rate', 'draw_rate', 'loss_rate', 'scored_rate', 'clean_sheet_rate', 'btts_rate', 'over15_rate', 'over25_rate', 'under35_rate',
+] as const
+
+/**
+ * Pull a profile's rates towards its league's, as if it had RULES.priorGames
+ * extra league-average games: (rate·n + league·prior) / (n + prior). Same as
+ * the Go engine's WithPrior. No league, or a prior of 0, changes nothing.
+ */
+export function withPrior(p: TeamProfile): TeamProfile {
+  const m = RULES.priorGames
+  if (!p.league || m <= 0) return p
+  const n = p.sample_size
+  const out = { ...p }
+  for (const k of RATE_KEYS) out[k] = (p[k] * n + p.league[k] * m) / (n + m)
+  return out
 }
 
 export interface MarketEstimate {
@@ -65,12 +91,19 @@ export function estimateMarket(key: MarketKey, home: TeamProfile, away: TeamProf
   let estimate: number
   let reason: string
 
-  const homeWin = avg(h.win_rate, a.loss_rate)
-  const awayWin = avg(a.win_rate, h.loss_rate)
-  const btts = avg(h.btts_rate, a.btts_rate)
-  const over15 = avg(h.over15_rate, a.over15_rate)
-  const over25 = avg(h.over25_rate, a.over25_rate)
-  const under35 = avg(h.under35_rate, a.under35_rate)
+  // Reasons quote each team's own record (h, a); the numbers use the rates
+  // pulled towards the league average (hp, ap).
+  const hp = withPrior(h)
+  const ap = withPrior(a)
+  const homeWin = avg(hp.win_rate, ap.loss_rate)
+  const awayWin = avg(ap.win_rate, hp.loss_rate)
+  const draw = avg(hp.draw_rate, ap.draw_rate)
+  const homeScores = avg(hp.scored_rate, 1 - ap.clean_sheet_rate)
+  const awayScores = avg(ap.scored_rate, 1 - hp.clean_sheet_rate)
+  const btts = avg(hp.btts_rate, ap.btts_rate)
+  const over15 = avg(hp.over15_rate, ap.over15_rate)
+  const over25 = avg(hp.over25_rate, ap.over25_rate)
+  const under35 = avg(hp.under35_rate, ap.under35_rate)
 
   switch (key) {
     case 'HOME_WIN':
@@ -82,7 +115,7 @@ export function estimateMarket(key: MarketKey, home: TeamProfile, away: TeamProf
       reason = `${a.team} won ${count(a.win_rate, an)} of last ${an} away games; ${h.team} lost ${count(h.loss_rate, hn)} of last ${hn} at home.`
       break
     case 'DRAW':
-      estimate = avg(h.draw_rate, a.draw_rate)
+      estimate = draw
       reason = `${h.team} drew ${count(h.draw_rate, hn)} of last ${hn} at home; ${a.team} drew ${count(a.draw_rate, an)} of last ${an} away.`
       break
     case 'DC_1X':
@@ -94,11 +127,11 @@ export function estimateMarket(key: MarketKey, home: TeamProfile, away: TeamProf
       reason = `${h.team} won ${count(h.win_rate, hn)} of last ${hn} at home; ${a.team} lost ${count(a.loss_rate, an)} of last ${an} away.`
       break
     case 'HOME_TO_SCORE':
-      estimate = avg(h.scored_rate, 1 - a.clean_sheet_rate)
+      estimate = homeScores
       reason = `${h.team} scored in ${count(h.scored_rate, hn)} of last ${hn} home games; ${a.team} kept ${count(a.clean_sheet_rate, an)} clean sheets in ${an} away.`
       break
     case 'AWAY_TO_SCORE':
-      estimate = avg(a.scored_rate, 1 - h.clean_sheet_rate)
+      estimate = awayScores
       reason = `${a.team} scored in ${count(a.scored_rate, an)} of last ${an} away games; ${h.team} kept ${count(h.clean_sheet_rate, hn)} clean sheets in ${hn} at home.`
       break
     case 'BTTS_YES':

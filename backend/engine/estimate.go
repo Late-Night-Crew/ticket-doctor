@@ -22,15 +22,21 @@ type MarketEstimate struct {
 // views of the same event. Markets the SRS doesn't define directly use
 // complements (addendum A1): BTTS no, Under 1.5, Under 2.5, Over 3.5.
 func (e *Engine) Estimate(m Market, home, away Profile) (MarketEstimate, error) {
+	// Reasons quote each team's own record (h, a); the numbers use the rates
+	// pulled towards the league average (hp, ap), see WithPrior.
 	h, a := home, away
 	hn, an := h.SampleSize, a.SampleSize
+	hp, ap := e.WithPrior(h), e.WithPrior(a)
 
-	homeWin := avg(h.WinRate, a.LossRate)
-	awayWin := avg(a.WinRate, h.LossRate)
-	btts := avg(h.BTTSRate, a.BTTSRate)
-	over15 := avg(h.Over15Rate, a.Over15Rate)
-	over25 := avg(h.Over25Rate, a.Over25Rate)
-	under35 := avg(h.Under35Rate, a.Under35Rate)
+	homeWin := avg(hp.WinRate, ap.LossRate)
+	awayWin := avg(ap.WinRate, hp.LossRate)
+	draw := avg(hp.DrawRate, ap.DrawRate)
+	homeScores := avg(hp.ScoredRate, 1-ap.CleanSheetRate)
+	awayScores := avg(ap.ScoredRate, 1-hp.CleanSheetRate)
+	btts := avg(hp.BTTSRate, ap.BTTSRate)
+	over15 := avg(hp.Over15Rate, ap.Over15Rate)
+	over25 := avg(hp.Over25Rate, ap.Over25Rate)
+	under35 := avg(hp.Under35Rate, ap.Under35Rate)
 
 	var est float64
 	var reason string
@@ -44,7 +50,7 @@ func (e *Engine) Estimate(m Market, home, away Profile) (MarketEstimate, error) 
 		reason = fmt.Sprintf("%s won %d of last %d away games; %s lost %d of last %d at home.",
 			a.Team, count(a.WinRate, an), an, h.Team, count(h.LossRate, hn), hn)
 	case Draw:
-		est = avg(h.DrawRate, a.DrawRate)
+		est = draw
 		reason = fmt.Sprintf("%s drew %d of last %d at home; %s drew %d of last %d away.",
 			h.Team, count(h.DrawRate, hn), hn, a.Team, count(a.DrawRate, an), an)
 	case DC1X:
@@ -56,11 +62,11 @@ func (e *Engine) Estimate(m Market, home, away Profile) (MarketEstimate, error) 
 		reason = fmt.Sprintf("%s won %d of last %d at home; %s lost %d of last %d away.",
 			h.Team, count(h.WinRate, hn), hn, a.Team, count(a.LossRate, an), an)
 	case HomeToScore:
-		est = avg(h.ScoredRate, 1-a.CleanSheetRate)
+		est = homeScores
 		reason = fmt.Sprintf("%s scored in %d of last %d home games; %s kept %d clean sheets in %d away.",
 			h.Team, count(h.ScoredRate, hn), hn, a.Team, count(a.CleanSheetRate, an), an)
 	case AwayToScore:
-		est = avg(a.ScoredRate, 1-h.CleanSheetRate)
+		est = awayScores
 		reason = fmt.Sprintf("%s scored in %d of last %d away games; %s kept %d clean sheets in %d at home.",
 			a.Team, count(a.ScoredRate, an), an, h.Team, count(h.CleanSheetRate, hn), hn)
 	case BTTSYes:

@@ -92,6 +92,19 @@ func TestImportBuildsMatchesTeamsAndProfiles(t *testing.T) {
 	if p.sample != 5 {
 		t.Errorf("sample = %d, want 5", p.sample)
 	}
+
+	// League averages at each venue (prior_games): home and away sides of the
+	// same games, so the home win rate equals the away loss rate.
+	var homeN, awayN int
+	var homeWin, awayLoss float64
+	if err := pool.QueryRow(ctx, `SELECT h.sample_size, a.sample_size, h.win_rate, a.loss_rate
+		FROM league_profiles h JOIN league_profiles a ON a.league_id = h.league_id AND a.venue = 'away'
+		WHERE h.league_id = 'epl' AND h.venue = 'home'`).Scan(&homeN, &awayN, &homeWin, &awayLoss); err != nil {
+		t.Fatalf("league profiles: %v", err)
+	}
+	if homeN == 0 || homeN != awayN || math.Abs(homeWin-awayLoss) > 1e-12 {
+		t.Errorf("league profiles: %d/%d games, home win %.3f vs away loss %.3f", homeN, awayN, homeWin, awayLoss)
+	}
 	for _, c := range checks {
 		if math.Abs(c.got-c.want) > 1e-9 {
 			t.Errorf("Arsenal home %s = %v, want %v", c.name, c.got, c.want)

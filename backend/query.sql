@@ -362,7 +362,8 @@ ORDER BY l.saved_ticket_id, l.position;
 DELETE FROM saved_tickets WHERE id = $1 AND ticket_id = $2;
 
 -- name: MarkSavedSettled :execrows
-UPDATE saved_tickets t SET settled_at = now()
+-- settled_at comes from the app's clock, the same one that later expires it.
+UPDATE saved_tickets t SET settled_at = sqlc.arg(now)::timestamptz
 WHERE settled_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM saved_ticket_legs l JOIN matches m ON m.id = l.match_id
                   WHERE l.saved_ticket_id = t.id AND m.status <> 'finished');
@@ -400,3 +401,22 @@ JOIN analysed_legs l ON l.id = s.analysed_leg_id
 JOIN matches m ON m.id = l.match_id
 WHERE l.on_ticket AND m.status = 'finished'
   AND (sqlc.narg(league_id)::text IS NULL OR m.league_id = sqlc.narg(league_id)::text);
+
+-- ---------- league profiles (prior_games) ----------
+
+-- name: UpsertLeagueProfile :exec
+INSERT INTO league_profiles (league_id, venue, sample_size, win_rate, draw_rate, loss_rate, gf_avg, ga_avg,
+                             scored_rate, clean_sheet_rate, btts_rate, over15_rate, over25_rate, under35_rate)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+ON CONFLICT (league_id, venue) DO UPDATE
+SET sample_size = EXCLUDED.sample_size, win_rate = EXCLUDED.win_rate, draw_rate = EXCLUDED.draw_rate,
+    loss_rate = EXCLUDED.loss_rate, gf_avg = EXCLUDED.gf_avg, ga_avg = EXCLUDED.ga_avg,
+    scored_rate = EXCLUDED.scored_rate, clean_sheet_rate = EXCLUDED.clean_sheet_rate,
+    btts_rate = EXCLUDED.btts_rate, over15_rate = EXCLUDED.over15_rate, over25_rate = EXCLUDED.over25_rate,
+    under35_rate = EXCLUDED.under35_rate, updated_at = now();
+
+-- name: ListLeagueProfiles :many
+SELECT * FROM league_profiles;
+
+-- name: ListTeamLeagues :many
+SELECT id, league_id FROM teams WHERE id = ANY (sqlc.arg(ids)::bigint[]);

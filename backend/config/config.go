@@ -87,6 +87,7 @@ type RulesConfig struct {
 	ValueMargin        float64 `mapstructure:"value_margin"`
 	BoldFloor          float64 `mapstructure:"bold_floor"`
 	MaxEstimate        float64 `mapstructure:"max_estimate"`
+	PriorGames         float64 `mapstructure:"prior_games"`
 }
 
 // Thresholds converts the config section for the engine.
@@ -101,6 +102,7 @@ func (r RulesConfig) Thresholds() engine.Thresholds {
 		ValueMargin:        r.ValueMargin,
 		BoldFloor:          r.BoldFloor,
 		MaxEstimate:        r.MaxEstimate,
+		PriorGames:         r.PriorGames,
 	}
 }
 
@@ -115,6 +117,7 @@ func rulesFrom(t engine.Thresholds) RulesConfig {
 		ValueMargin:        t.ValueMargin,
 		BoldFloor:          t.BoldFloor,
 		MaxEstimate:        t.MaxEstimate,
+		PriorGames:         t.PriorGames,
 	}
 }
 

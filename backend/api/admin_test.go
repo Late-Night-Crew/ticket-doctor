@@ -234,7 +234,7 @@ func TestAdminResultEntry(t *testing.T) {
 	}
 
 	var th []services.Threshold
-	if res := authed(t, a, cookie, "GET", "/api/admin/thresholds", "", &th); res.StatusCode != 200 || len(th) != 9 ||
+	if res := authed(t, a, cookie, "GET", "/api/admin/thresholds", "", &th); res.StatusCode != 200 || len(th) != 10 ||
 		th[len(th)-1].Key != "max_estimate" || th[len(th)-1].Value != 0.95 {
 		t.Fatalf("thresholds: %d %+v", res.StatusCode, th)
 	}

@@ -43,14 +43,18 @@ var backtestCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewCalibrationService(pool, eng)
-		run := func(prior float64) (*services.Calibration, error) {
+		run := func(prior *float64) (*services.Calibration, error) {
 			return svc.Calibration(ctx, services.CalibrationRequest{
 				Source: services.SourceBacktest, League: backtestFlags.league, Market: backtestFlags.market,
 				IncludeLowConfidence: backtestFlags.low, Prior: prior,
 			})
 		}
-		if len(backtestFlags.priors) == 1 {
-			res, err := run(backtestFlags.priors[0])
+		if len(backtestFlags.priors) <= 1 {
+			var prior *float64 // the rules in use now
+			if len(backtestFlags.priors) == 1 {
+				prior = &backtestFlags.priors[0]
+			}
+			res, err := run(prior)
 			if err != nil {
 				return err
 			}
@@ -96,11 +100,11 @@ func printCalibration(r *services.Calibration) {
 
 // comparePriors runs the backtest once per prior and prints one line each,
 // to choose how strongly to pull team rates towards the league average.
-func comparePriors(priors []float64, run func(float64) (*services.Calibration, error)) error {
+func comparePriors(priors []float64, run func(*float64) (*services.Calibration, error)) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
 	fmt.Fprintln(w, "PRIOR\tBRIER\tSAID 90%+\tHAPPENED\tSAID <10%\tHAPPENED\tLOW SAID\tLOW HAPPENED\tWIN SKILL\tGOALS SKILL\tMARKETS ≤0\t")
 	for _, p := range priors {
-		r, err := run(p)
+		r, err := run(&p)
 		if err != nil {
 			return err
 		}
@@ -139,6 +143,6 @@ func init() {
 	backtestCmd.Flags().StringVar(&backtestFlags.league, "league", "", "only this league (epl, laliga, bundesliga)")
 	backtestCmd.Flags().StringVar(&backtestFlags.market, "market", "", "only this market, e.g. OVER_2_5")
 	backtestCmd.Flags().BoolVar(&backtestFlags.low, "include-low-confidence", false, "also rate games where a team has too few past games")
-	backtestCmd.Flags().Float64SliceVar(&backtestFlags.priors, "prior", []float64{0}, "experiment: pull team rates towards the league average by this many games; several (e.g. 0,3,5,10) compares them")
+	backtestCmd.Flags().Float64SliceVar(&backtestFlags.priors, "prior", nil, "override the prior_games rule (pull team rates towards the league average by this many games); several, e.g. 0,5,10,20, compares them")
 	rootCmd.AddCommand(backtestCmd)
 }

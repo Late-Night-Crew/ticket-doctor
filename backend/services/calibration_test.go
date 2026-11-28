@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"math"
 	"testing"
 	"time"
 
@@ -26,7 +25,9 @@ func TestBacktestHasNoHindsight(t *testing.T) {
 		t.Fatalf("default: %+v (%v)", res, err)
 	}
 
-	res, err = s.Calibration(ctx, CalibrationRequest{Source: SourceBacktest, Market: "HOME_WIN", IncludeLowConfidence: true})
+	// Without the league prior, so the numbers below are the raw records.
+	off := 0.0
+	res, err = s.Calibration(ctx, CalibrationRequest{Source: SourceBacktest, Market: "HOME_WIN", IncludeLowConfidence: true, Prior: &off})
 	if err != nil || res.N != 2 {
 		t.Fatalf("with thin profiles: %+v (%v)", res, err)
 	}
@@ -73,18 +74,5 @@ func TestCalibrationFromTickets(t *testing.T) {
 	}
 	if _, err := s.Calibration(ctx, CalibrationRequest{Source: "astrology"}); !isStatus(err, 422) {
 		t.Fatalf("bad source: %v", err)
-	}
-}
-
-func TestShrinkPullsTowardsTheLeague(t *testing.T) {
-	team := engine.Profile{SampleSize: 10, WinRate: 1, Over25Rate: 0.2, GoalsForAvg: 3}
-	league := engine.Profile{SampleSize: 380, WinRate: 0.45, Over25Rate: 0.6, GoalsForAvg: 1.5}
-	if got := shrink(team, league, 0); got != team {
-		t.Fatalf("prior 0 changed the profile: %+v", got)
-	}
-	// A prior as large as the sample sits halfway; the sample size is kept.
-	got := shrink(team, league, 10)
-	if math.Abs(got.WinRate-0.725) > 1e-9 || math.Abs(got.Over25Rate-0.4) > 1e-9 || math.Abs(got.GoalsForAvg-2.25) > 1e-9 || got.SampleSize != 10 {
-		t.Fatalf("prior 10: %+v", got)
 	}
 }

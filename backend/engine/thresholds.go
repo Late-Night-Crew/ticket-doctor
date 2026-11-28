@@ -26,6 +26,10 @@ type Thresholds struct {
 	// MaxEstimate caps every estimate, so the app never shows a near-certainty:
 	// 10 wins in 10 games is a good record, not a 100% chance (RG-1, agreed 2026-11-27).
 	MaxEstimate float64
+	// PriorGames pulls each team's rates towards its league's average, as if
+	// it had this many extra average games (0 = off). Agreed 2026-11-28 from
+	// the backtest; see Profile.WithPrior.
+	PriorGames float64
 }
 
 // DefaultThresholds returns the values in the SRS.
@@ -40,6 +44,7 @@ func DefaultThresholds() Thresholds {
 		ValueMargin:        0.05,
 		BoldFloor:          0.35,
 		MaxEstimate:        0.95,
+		PriorGames:         10,
 	}
 }
 
@@ -63,5 +68,6 @@ func (t Thresholds) Validate() error {
 		"bold floor must be above 0 and below medium_from, got %.2f", t.BoldFloor)
 	check(t.MaxEstimate > t.LowFrom && t.MaxEstimate <= 1,
 		"max estimate must be above low_from and at most 1, got %.2f", t.MaxEstimate)
+	check(t.PriorGames >= 0 && t.PriorGames <= 100, "prior games must be 0-100, got %g", t.PriorGames)
 	return errors.Join(errs...)
 }

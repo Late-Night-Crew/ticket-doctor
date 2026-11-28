@@ -80,6 +80,24 @@ The row per ticket and match (the user's pick, the suggestions shown, the final 
 
 Agreed 2026-11-27. After any formula in 4.1 (and A1), an estimate is limited to **95%** (`max_estimate`, NFR-6). A team that scored in all of its last 10 home games has a strong record, not a certain result, and showing 100% would read as a guarantee (RG-1). The reason sentence still gives the real record ("scored in 10 of last 10 home games"). The capped value is used everywhere: risk bands, swaps, combined chance, fair odds and the wizard.
 
+### A8. Estimates lean on the league average (amends 4.1)
+
+Agreed 2026-11-28 from the backtest (admin → Calibration).
+
+**The problem.** Ten games is a small sample, so raw rates overshoot. Estimates of 90% and above happened only 82% of the time, and goals markets did worse than simply guessing each league's average rate.
+
+**The rule.** Each team's rates are now pulled towards its league's average at the same venue, as if the team had played **10 more league-average games** (`prior_games`, NFR-6):
+
+    rate = (team rate × n + league rate × 10) / (n + 10)
+
+- The league average comes from about the league's last season (380 games), rebuilt by every import.
+- **Reason sentences still quote the team's own record** (A7).
+- Limited data is still judged on the team's own games.
+
+**Backtest result (1,009 games).** 90%+ estimates now happen 93% of the time. The Low band is said 75.6% against 75.3% happened. Markets no better than the average dropped from 10 to 3 of 15.
+
+**The cost.** About 10% fewer legs reach the Low band.
+
 ---
 
 ## B. Version 2: saved tickets and pick comparison
