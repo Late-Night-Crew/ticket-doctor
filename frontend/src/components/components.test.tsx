@@ -1,5 +1,8 @@
 import { Footer } from './Footer'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
+import { TicketProvider } from '../state/TicketContext'
+import { AppLayout } from './AppLayout'
 import userEvent from '@testing-library/user-event'
 import { Disclaimer } from './Disclaimer'
 import { GlossaryTerm } from './GlossaryTerm'
@@ -46,5 +49,22 @@ describe('Footer (RG-4)', () => {
     }
     expect(screen.getByRole('link', { name: 'MAGLA' })).toHaveAttribute('href', 'https://magla.org.mw')
     expect(screen.getByText(/In Malawi, the gambling regulator/)).toBeInTheDocument()
+  })
+})
+
+describe('Bottom navigation (phones)', () => {
+  it('shows short labels but announces the full ones, each short label inside its full name', () => {
+    render(
+      <MemoryRouter>
+        <TicketProvider>
+          <AppLayout />
+        </TicketProvider>
+      </MemoryRouter>,
+    )
+    const nav = screen.getAllByRole('navigation', { name: 'Main' }).find((n) => n.classList.contains('td-bottomnav'))!
+    const links = within(nav).getAllByRole('link')
+    expect(links.map((l) => l.textContent)).toEqual(['Home', 'Check', 'Build', 'Record', 'Tickets'])
+    expect(links.map((l) => l.getAttribute('aria-label'))).toEqual(['Home', 'Check a ticket', 'Build for me', 'Track record', 'My tickets'])
+    for (const l of links) expect(l.getAttribute('aria-label')!.toLowerCase()).toContain(l.textContent!.toLowerCase())
   })
 })

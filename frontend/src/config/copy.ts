@@ -12,6 +12,9 @@ export const COPY = {
     results: 'Track record',
     saved: 'My tickets',
     glossary: 'Glossary',
+    /** Phone bottom nav: five items must fit on one line each. Each is part of its full label (WCAG 2.5.3). */
+    short: { home: 'Home', build: 'Check', wizard: 'Build', results: 'Record', saved: 'Tickets' },
+    legsOnTicket: (n: number) => `${n} leg${n === 1 ? '' : 's'} on your ticket`,
   },
 
   home: {

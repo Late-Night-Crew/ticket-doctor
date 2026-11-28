@@ -9,11 +9,11 @@ import { RouteEffects } from './RouteEffects'
 import { ThemeToggle } from './ThemeToggle'
 
 const NAV = [
-  { to: '/', label: COPY.nav.home, icon: IconHome, end: true },
-  { to: '/ticket', label: COPY.nav.build, icon: IconTicket, end: false },
-  { to: '/wizard', label: COPY.nav.wizard, icon: IconWand, end: false },
-  { to: '/results', label: COPY.nav.results, icon: IconChart, end: false },
-  { to: '/tickets', label: COPY.nav.saved, icon: IconBookmark, end: false },
+  { to: '/', label: COPY.nav.home, short: COPY.nav.short.home, icon: IconHome, end: true },
+  { to: '/ticket', label: COPY.nav.build, short: COPY.nav.short.build, icon: IconTicket, end: false },
+  { to: '/wizard', label: COPY.nav.wizard, short: COPY.nav.short.wizard, icon: IconWand, end: false },
+  { to: '/results', label: COPY.nav.results, short: COPY.nav.short.results, icon: IconChart, end: false },
+  { to: '/tickets', label: COPY.nav.saved, short: COPY.nav.short.saved, icon: IconBookmark, end: false },
 ]
 
 export function AppLayout() {
@@ -64,15 +64,21 @@ export function AppLayout() {
       <Footer />
 
       <nav className="td-bottomnav" aria-label="Main">
-        {NAV.map(({ to, label, icon: Icon, end }) => (
-          <NavLink key={to} to={to} end={end}>
+        {NAV.map(({ to, label, short, icon: Icon, end }) => (
+          // Short visible label; the full one is what screen readers announce.
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            aria-label={to === '/ticket' && legCount > 0 ? `${label}, ${COPY.nav.legsOnTicket(legCount)}` : label}
+          >
             <span className="position-relative">
               <Icon />
               {to === '/ticket' && legCount > 0 && (
                 <span className="badge rounded-pill text-bg-primary td-bottomnav-count td-num">{legCount}</span>
               )}
             </span>
-            {label}
+            {short}
           </NavLink>
         ))}
       </nav>
