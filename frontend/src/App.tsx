@@ -17,6 +17,7 @@ const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
 const AdminLogin = lazy(() => import('./pages/admin/Login'))
 const AdminSetup = lazy(() => import('./pages/admin/Setup'))
 const AdminAccounts = lazy(() => import('./pages/admin/Admins'))
+const AdminCalibration = lazy(() => import('./pages/admin/Calibration'))
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'))
 const AdminResults = lazy(() => import('./pages/admin/ResultEntry'))
 const AdminThresholds = lazy(() => import('./pages/admin/Thresholds'))
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="results" element={<AdminResults />} />
         <Route path="thresholds" element={<AdminThresholds />} />
         <Route path="admins" element={<AdminAccounts />} />
+        <Route path="calibration" element={<AdminCalibration />} />
         <Route path="*" element={<NotFound />} />
       </Route>
       <Route element={<AppLayout />}>

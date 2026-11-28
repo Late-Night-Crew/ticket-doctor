@@ -182,3 +182,61 @@ $td-admin-sidebar: 15rem;
     max-width: 24rem;
   }
 }
+
+// Reliability chart (Calibration page): one series, recessive chrome.
+.td-relchart {
+  position: relative;
+  max-width: 26rem;
+
+  &__grid {
+    stroke: var(--td-line);
+    stroke-width: 1;
+  }
+  &__tick {
+    fill: var(--td-muted);
+    font-size: 10px;
+  }
+  &__axis {
+    fill: var(--td-muted);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  &__ideal {
+    stroke: var(--td-muted);
+    stroke-width: 1;
+  }
+  &__line {
+    fill: none;
+    stroke: var(--td-brand);
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+  &__dot {
+    fill: var(--td-brand);
+    stroke: var(--td-surface); // 2px surface ring
+    stroke-width: 2;
+  }
+  &__hit {
+    fill: transparent;
+    cursor: pointer;
+    outline: none;
+
+    &:focus-visible {
+      stroke: var(--td-ink);
+      stroke-width: 2;
+    }
+  }
+  &__tip {
+    position: absolute;
+    transform: translate(-50%, calc(-100% - 12px));
+    pointer-events: none;
+    padding: 0.35rem 0.55rem;
+    border-radius: var(--bs-border-radius);
+    background: var(--td-surface);
+    border: 1px solid var(--td-line);
+    box-shadow: var(--td-shadow);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    color: var(--td-ink);
+  }
+}

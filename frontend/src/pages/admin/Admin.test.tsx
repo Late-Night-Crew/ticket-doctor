@@ -169,4 +169,24 @@ describe('Admin area (B6)', () => {
     await user.click(within(change).getByRole('button', { name: 'Change password' }))
     expect(await within(change).findByRole('status')).toHaveTextContent('Password changed.')
   })
+
+  it('shows calibration: what we said vs what happened, by band and market', async () => {
+    const user = userEvent.setup()
+    renderAt('/admin/calibration')
+    await signIn(user)
+    expect(await screen.findByRole('img', { name: /Reliability chart/ })).toBeInTheDocument()
+
+    // The table holds every value the chart shows (tooltips never gate).
+    const bins = screen.getByRole('region', { name: 'By estimate' })
+    const top = within(bins).getByText('90%–100%').closest('tr')!
+    expect(top).toHaveTextContent('81.8%')
+    expect(top).toHaveTextContent('10.2 pts, too confident')
+
+    const markets = screen.getByRole('region', { name: 'By market: do the team stats help?' })
+    expect(within(markets).getByText('BTTS yes').closest('tr')).toHaveTextContent('no better than guessing')
+
+    // Real tickets: empty until games finish.
+    await user.click(screen.getByRole('button', { name: 'Real tickets' }))
+    expect(await screen.findByText(/No analysed picks have finished games yet/)).toBeInTheDocument()
+  })
 })

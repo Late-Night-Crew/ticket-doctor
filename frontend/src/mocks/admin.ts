@@ -4,7 +4,7 @@
  * the session in an HttpOnly cookie; here it's a flag in memory.
  */
 import { delay, http, HttpResponse } from 'msw'
-import type { Admin, AdminAccount, AdminMatch, Dashboard, Threshold } from '../api/admin'
+import type { Admin, AdminAccount, AdminMatch, Calibration, Dashboard, Threshold } from '../api/admin'
 import { RULES } from '../config/rules'
 
 const API = '*/api/admin'
@@ -140,6 +140,11 @@ export const adminHandlers = [
 
   http.get(`${API}/thresholds`, () => HttpResponse.json(THRESHOLDS)),
 
+  http.get(`${API}/calibration`, ({ request }) => {
+    const source = new URL(request.url).searchParams.get('source') ?? 'backtest'
+    return HttpResponse.json(source === 'tickets' ? EMPTY_CALIBRATION : BACKTEST)
+  }),
+
   http.get(`${API}/users`, () => HttpResponse.json(accounts)),
 
   http.post(`${API}/users`, async ({ request }) => {
@@ -164,3 +169,31 @@ export const adminHandlers = [
     return HttpResponse.json({ admin: ME, expires_at: new Date(Date.now() + 12 * 3600_000).toISOString() })
   }),
 ]
+
+/** The real backtest from 2026-11-28 (1,009 games), trimmed to a few markets. */
+const BACKTEST: Calibration = {
+  source: 'backtest',
+  n: 15135,
+  matches: 1009,
+  skipped_low_confidence: 386,
+  brier: 0.2153,
+  bins: [
+    [0.07, 0.194, 382], [0.16, 0.218, 1029], [0.239, 0.277, 1292], [0.334, 0.361, 2023], [0.429, 0.441, 1792],
+    [0.527, 0.516, 2304], [0.63, 0.615, 2069], [0.728, 0.705, 2006], [0.825, 0.794, 1517], [0.92, 0.818, 721],
+  ].map(([predicted, actual, n], i) => ({ from: i / 10, to: (i + 1) / 10, n, predicted, actual })),
+  bands: [
+    { band: 'low', n: 5246, predicted: 0.769, actual: 0.731 },
+    { band: 'medium', n: 4194, predicted: 0.533, actual: 0.53 },
+    { band: 'high', n: 5695, predicted: 0.276, actual: 0.314 },
+  ],
+  markets: [
+    { market: 'HOME_WIN', n: 1009, predicted: 0.454, actual: 0.445, brier: 0.2316, base_brier: 0.247, skill: 0.062 },
+    { market: 'BTTS_YES', n: 1009, predicted: 0.573, actual: 0.576, brier: 0.2563, base_brier: 0.2443, skill: -0.049 },
+    { market: 'OVER_2_5', n: 1009, predicted: 0.557, actual: 0.561, brier: 0.2525, base_brier: 0.2463, skill: -0.025 },
+  ],
+}
+
+const EMPTY_CALIBRATION: Calibration = {
+  source: 'tickets', n: 0, matches: 0, skipped_low_confidence: 0, brier: 0,
+  bins: BACKTEST.bins.map((b) => ({ ...b, n: 0, predicted: 0, actual: 0 })), bands: [], markets: [],
+}

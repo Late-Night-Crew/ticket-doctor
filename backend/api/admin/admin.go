@@ -25,14 +25,15 @@ const (
 )
 
 type Handler struct {
-	auth  *services.AuthService
-	admin *services.AdminService
+	auth        *services.AuthService
+	admin       *services.AdminService
+	calibration *services.CalibrationService
 	// secure marks the cookie HTTPS-only (always, except local development).
 	secure bool
 }
 
-func New(auth *services.AuthService, admin *services.AdminService, secure bool) *Handler {
-	return &Handler{auth: auth, admin: admin, secure: secure}
+func New(auth *services.AuthService, admin *services.AdminService, calibration *services.CalibrationService, secure bool) *Handler {
+	return &Handler{auth: auth, admin: admin, calibration: calibration, secure: secure}
 }
 
 // Register adds the admin routes under r (which is /api).
@@ -63,6 +64,7 @@ func (h *Handler) Register(r fiber.Router) {
 	signedIn.Get("/matches", h.matches)
 	signedIn.Put("/matches/:id/result", h.enterResult)
 	signedIn.Get("/thresholds", h.thresholds)
+	signedIn.Get("/calibration", h.calibrationReport)
 }
 
 // Disabled answers every admin route when no session secret is configured in
@@ -279,4 +281,19 @@ func (h *Handler) changePassword(c fiber.Ctx) error {
 		return apierr.From(err)
 	}
 	return h.startSession(c, s)
+}
+
+// calibrationReport: ?source=backtest|tickets&league=&market=&kind=picks|suggestions&low=1
+func (h *Handler) calibrationReport(c fiber.Ctx) error {
+	res, err := h.calibration.Calibration(c.Context(), services.CalibrationRequest{
+		Source:               services.CalibrationSource(c.Query("source")),
+		League:               c.Query("league"),
+		Market:               c.Query("market"),
+		Kind:                 c.Query("kind"),
+		IncludeLowConfidence: c.Query("low") == "1",
+	})
+	if err != nil {
+		return apierr.From(err)
+	}
+	return c.JSON(res)
 }
