@@ -4,7 +4,7 @@
  */
 import type { Fixture, League, Team } from '../api/types'
 import { RULES } from '../config/rules'
-import type { TeamProfile } from './scorer'
+import type { LeagueRates, TeamProfile } from './scorer'
 
 export const LEAGUES: League[] = [
   { id: 'epl', name: 'Premier League', country: 'England' },
@@ -97,7 +97,7 @@ function formString(name: string): string {
   }).join('-')
 }
 
-export const TEAMS: MockTeam[] = Object.entries(TEAM_NAMES).flatMap(([leagueId, names]) =>
+const RAW_TEAMS: MockTeam[] = Object.entries(TEAM_NAMES).flatMap(([leagueId, names]) =>
   names.map((raw, i) => {
     const promoted = raw.endsWith('*')
     const name = raw.replace('*', '')
@@ -116,6 +116,25 @@ export const TEAMS: MockTeam[] = Object.entries(TEAM_NAMES).flatMap(([leagueId, 
     }
   }),
 )
+
+/** Each league's average at each venue, attached to every profile (RULES.priorGames). */
+function leagueAverage(teams: MockTeam[], venue: 'home' | 'away'): LeagueRates {
+  const keys = ['win_rate', 'draw_rate', 'loss_rate', 'scored_rate', 'clean_sheet_rate', 'btts_rate', 'over15_rate', 'over25_rate', 'under35_rate'] as const
+  const out = {} as LeagueRates
+  for (const k of keys) out[k] = teams.reduce((sum, t) => sum + t.profiles[venue][k], 0) / teams.length
+  return out
+}
+
+export const TEAMS: MockTeam[] = RAW_TEAMS.map((t) => {
+  const league = RAW_TEAMS.filter((o) => o.league_id === t.league_id)
+  return {
+    ...t,
+    profiles: {
+      home: { ...t.profiles.home, league: leagueAverage(league, 'home') },
+      away: { ...t.profiles.away, league: leagueAverage(league, 'away') },
+    },
+  }
+})
 
 const TEAM_BY_ID = new Map(TEAMS.map((t) => [t.id, t]))
 

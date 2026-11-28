@@ -17,6 +17,11 @@ export const RULES = {
   valueMargin: 0.05,
   /** No estimate goes above this: a perfect record isn't a certainty (agreed 2026-11-27). */
   maxEstimate: 0.95,
+  /**
+   * Pull each team's rates towards its league's average, as if it had this many
+   * extra average games (agreed 2026-11-28 from the backtest; 0 = off).
+   */
+  priorGames: 10,
   maxLegs: 15,
   wizard: {
     boldFloor: 0.35,

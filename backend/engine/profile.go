@@ -31,6 +31,31 @@ type Profile struct {
 	Over15Rate      float64 `json:"over15_rate"`
 	Over25Rate      float64 `json:"over25_rate"`
 	Under35Rate     float64 `json:"under35_rate"`
+	// League is the league's average profile at the same venue. When set,
+	// estimates pull this team's rates towards it by PriorGames (see
+	// WithPrior); reason sentences still quote the team's own record.
+	League *Profile `json:"league,omitempty"`
+}
+
+// WithPrior returns the profile with its rates pulled towards its league's,
+// as if the team had PriorGames extra league-average games:
+// (rate·n + league·prior) / (n + prior). Ten games of form is a small sample,
+// so raw rates overshoot; the backtest (2026-11-28) found 90%+ estimates
+// happened only 82% of the time without this, and 93% with a prior of 10.
+// Without a league profile, or with PriorGames 0, it changes nothing.
+func (e *Engine) WithPrior(p Profile) Profile {
+	m := e.t.PriorGames
+	if p.League == nil || m <= 0 {
+		return p
+	}
+	l := *p.League
+	n := float64(p.SampleSize)
+	mix := func(team, league float64) float64 { return (team*n + league*m) / (n + m) }
+	p.WinRate, p.DrawRate, p.LossRate = mix(p.WinRate, l.WinRate), mix(p.DrawRate, l.DrawRate), mix(p.LossRate, l.LossRate)
+	p.GoalsForAvg, p.GoalsAgainstAvg = mix(p.GoalsForAvg, l.GoalsForAvg), mix(p.GoalsAgainstAvg, l.GoalsAgainstAvg)
+	p.ScoredRate, p.CleanSheetRate, p.BTTSRate = mix(p.ScoredRate, l.ScoredRate), mix(p.CleanSheetRate, l.CleanSheetRate), mix(p.BTTSRate, l.BTTSRate)
+	p.Over15Rate, p.Over25Rate, p.Under35Rate = mix(p.Over15Rate, l.Over15Rate), mix(p.Over25Rate, l.Over25Rate), mix(p.Under35Rate, l.Under35Rate)
+	return p
 }
 
 // Result is one finished match seen from one team's side.
@@ -90,6 +115,18 @@ func (e *Engine) BuildProfile(team string, venue Venue, results []Result) Profil
 	p.ScoredRate, p.CleanSheetRate, p.BTTSRate = rate(scored), rate(clean), rate(btts)
 	p.Over15Rate, p.Over25Rate, p.Under35Rate = rate(o15), rate(o25), rate(u35)
 	return p
+}
+
+// LeagueWindow is how many recent games at a venue make a league's average
+// profile: about one season (20 teams × 19 home games).
+const LeagueWindow = 380
+
+// BuildLeagueProfile is a league's average record at one venue, from its
+// latest LeagueWindow games there (results seen from that venue's side).
+func (e *Engine) BuildLeagueProfile(league string, venue Venue, results []Result) Profile {
+	wide := *e
+	wide.t.FormWindow = LeagueWindow
+	return wide.BuildProfile(league, venue, results)
 }
 
 // LowConfidence reports whether the profile has too few matches (FR-2.3).

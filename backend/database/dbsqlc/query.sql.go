@@ -871,6 +871,46 @@ func (q *Queries) ListImportRuns(ctx context.Context, limit int32) ([]ImportRun,
 	return items, nil
 }
 
+const listLeagueProfiles = `-- name: ListLeagueProfiles :many
+SELECT league_id, venue, sample_size, win_rate, draw_rate, loss_rate, gf_avg, ga_avg, scored_rate, clean_sheet_rate, btts_rate, over15_rate, over25_rate, under35_rate, updated_at FROM league_profiles
+`
+
+func (q *Queries) ListLeagueProfiles(ctx context.Context) ([]LeagueProfile, error) {
+	rows, err := q.db.Query(ctx, listLeagueProfiles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LeagueProfile{}
+	for rows.Next() {
+		var i LeagueProfile
+		if err := rows.Scan(
+			&i.LeagueID,
+			&i.Venue,
+			&i.SampleSize,
+			&i.WinRate,
+			&i.DrawRate,
+			&i.LossRate,
+			&i.GfAvg,
+			&i.GaAvg,
+			&i.ScoredRate,
+			&i.CleanSheetRate,
+			&i.BttsRate,
+			&i.Over15Rate,
+			&i.Over25Rate,
+			&i.Under35Rate,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLeagues = `-- name: ListLeagues :many
 
 
@@ -1260,6 +1300,35 @@ func (q *Queries) ListSettledSuggestionEstimates(ctx context.Context, leagueID *
 	return items, nil
 }
 
+const listTeamLeagues = `-- name: ListTeamLeagues :many
+SELECT id, league_id FROM teams WHERE id = ANY ($1::bigint[])
+`
+
+type ListTeamLeaguesRow struct {
+	ID       int64
+	LeagueID string
+}
+
+func (q *Queries) ListTeamLeagues(ctx context.Context, ids []int64) ([]ListTeamLeaguesRow, error) {
+	rows, err := q.db.Query(ctx, listTeamLeagues, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTeamLeaguesRow{}
+	for rows.Next() {
+		var i ListTeamLeaguesRow
+		if err := rows.Scan(&i.ID, &i.LeagueID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeamsByLeague = `-- name: ListTeamsByLeague :many
 
 SELECT id, league_id, name, name_key, aliases, form, created_at FROM teams WHERE league_id = $1 ORDER BY name
@@ -1377,14 +1446,15 @@ func (q *Queries) LockUsers(ctx context.Context) error {
 }
 
 const markSavedSettled = `-- name: MarkSavedSettled :execrows
-UPDATE saved_tickets t SET settled_at = now()
+UPDATE saved_tickets t SET settled_at = $1::timestamptz
 WHERE settled_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM saved_ticket_legs l JOIN matches m ON m.id = l.match_id
                   WHERE l.saved_ticket_id = t.id AND m.status <> 'finished')
 `
 
-func (q *Queries) MarkSavedSettled(ctx context.Context) (int64, error) {
-	result, err := q.db.Exec(ctx, markSavedSettled)
+// settled_at comes from the app's clock, the same one that later expires it.
+func (q *Queries) MarkSavedSettled(ctx context.Context, now time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, markSavedSettled, now)
 	if err != nil {
 		return 0, err
 	}
@@ -1632,6 +1702,57 @@ func (q *Queries) UpsertFixture(ctx context.Context, arg UpsertFixtureParams) (U
 	var i UpsertFixtureRow
 	err := row.Scan(&i.ID, &i.Inserted)
 	return i, err
+}
+
+const upsertLeagueProfile = `-- name: UpsertLeagueProfile :exec
+
+INSERT INTO league_profiles (league_id, venue, sample_size, win_rate, draw_rate, loss_rate, gf_avg, ga_avg,
+                             scored_rate, clean_sheet_rate, btts_rate, over15_rate, over25_rate, under35_rate)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+ON CONFLICT (league_id, venue) DO UPDATE
+SET sample_size = EXCLUDED.sample_size, win_rate = EXCLUDED.win_rate, draw_rate = EXCLUDED.draw_rate,
+    loss_rate = EXCLUDED.loss_rate, gf_avg = EXCLUDED.gf_avg, ga_avg = EXCLUDED.ga_avg,
+    scored_rate = EXCLUDED.scored_rate, clean_sheet_rate = EXCLUDED.clean_sheet_rate,
+    btts_rate = EXCLUDED.btts_rate, over15_rate = EXCLUDED.over15_rate, over25_rate = EXCLUDED.over25_rate,
+    under35_rate = EXCLUDED.under35_rate, updated_at = now()
+`
+
+type UpsertLeagueProfileParams struct {
+	LeagueID       string
+	Venue          string
+	SampleSize     int32
+	WinRate        float64
+	DrawRate       float64
+	LossRate       float64
+	GfAvg          float64
+	GaAvg          float64
+	ScoredRate     float64
+	CleanSheetRate float64
+	BttsRate       float64
+	Over15Rate     float64
+	Over25Rate     float64
+	Under35Rate    float64
+}
+
+// ---------- league profiles (prior_games) ----------
+func (q *Queries) UpsertLeagueProfile(ctx context.Context, arg UpsertLeagueProfileParams) error {
+	_, err := q.db.Exec(ctx, upsertLeagueProfile,
+		arg.LeagueID,
+		arg.Venue,
+		arg.SampleSize,
+		arg.WinRate,
+		arg.DrawRate,
+		arg.LossRate,
+		arg.GfAvg,
+		arg.GaAvg,
+		arg.ScoredRate,
+		arg.CleanSheetRate,
+		arg.BttsRate,
+		arg.Over15Rate,
+		arg.Over25Rate,
+		arg.Under35Rate,
+	)
+	return err
 }
 
 const upsertMatch = `-- name: UpsertMatch :one

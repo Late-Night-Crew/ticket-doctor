@@ -40,10 +40,9 @@ type CalibrationRequest struct {
 	// IncludeLowConfidence keeps estimates from profiles with too few games
 	// (backtest only; the app marks those as limited data).
 	IncludeLowConfidence bool
-	// Prior (backtest only, an experiment) pulls each team's rates towards the
-	// league's average at that venue, as if the team had Prior extra average
-	// games. 0 is the live behaviour.
-	Prior float64
+	// Prior (backtest only) overrides the prior_games rule for an experiment;
+	// nil uses the rules in use now.
+	Prior *float64
 }
 
 // Bin is one slice of the reliability chart: estimates in [From, To).
@@ -165,19 +164,23 @@ func (s *CalibrationService) Calibration(ctx context.Context, req CalibrationReq
 
 // backtest rates every finished match from the games before it.
 func (s *CalibrationService) backtest(rows []dbsqlc.ListFinishedMatchesRow, req CalibrationRequest, acc *calAccumulator) (matches, skipped int) {
-	window := s.engine.Thresholds().FormWindow
+	eng := s.engine
+	if req.Prior != nil {
+		t := eng.Thresholds()
+		t.PriorGames = *req.Prior
+		if e, err := engine.New(t); err == nil {
+			eng = e
+		}
+	}
+	window := eng.Thresholds().FormWindow
 	home := map[int64][]engine.Result{} // each team's home results so far, oldest first
 	away := map[int64][]engine.Result{}
 	tail := func(r []engine.Result) []engine.Result { return r[max(0, len(r)-window):] }
 
-	// League averages per venue, from about a season of earlier games.
-	const leagueWindow = 380
-	lt := s.engine.Thresholds()
-	lt.FormWindow, lt.LowConfidenceBelow = leagueWindow, 1
-	leagueEng, _ := engine.New(lt)
+	// League averages per venue from earlier games, as the importer builds them.
 	leagueHome := map[string][]engine.Result{}
 	leagueAway := map[string][]engine.Result{}
-	ltail := func(r []engine.Result) []engine.Result { return r[max(0, len(r)-leagueWindow):] }
+	ltail := func(r []engine.Result) []engine.Result { return r[max(0, len(r)-engine.LeagueWindow):] }
 
 	markets := engine.Markets
 	if req.Market != "" {
@@ -188,14 +191,13 @@ func (s *CalibrationService) backtest(rows []dbsqlc.ListFinishedMatchesRow, req 
 			continue
 		}
 		hg, ag := int(*r.HomeGoals), int(*r.AwayGoals)
-		hp := s.engine.BuildProfile("", engine.Home, tail(home[r.HomeTeamID]))
-		ap := s.engine.BuildProfile("", engine.Away, tail(away[r.AwayTeamID]))
-		lowConf := s.engine.LowConfidence(hp) || s.engine.LowConfidence(ap)
-		if req.Prior > 0 {
-			if lh := leagueHome[r.LeagueID]; len(lh) > 0 {
-				hp = shrink(hp, leagueEng.BuildProfile("", engine.Home, ltail(lh)), req.Prior)
-				ap = shrink(ap, leagueEng.BuildProfile("", engine.Away, ltail(leagueAway[r.LeagueID])), req.Prior)
-			}
+		hp := eng.BuildProfile("", engine.Home, tail(home[r.HomeTeamID]))
+		ap := eng.BuildProfile("", engine.Away, tail(away[r.AwayTeamID]))
+		lowConf := eng.LowConfidence(hp) || eng.LowConfidence(ap)
+		if lh := leagueHome[r.LeagueID]; len(lh) > 0 {
+			lhp := eng.BuildLeagueProfile(r.LeagueID, engine.Home, ltail(lh))
+			lap := eng.BuildLeagueProfile(r.LeagueID, engine.Away, ltail(leagueAway[r.LeagueID]))
+			hp.League, ap.League = &lhp, &lap
 		}
 
 		// Record this result only after rating the match: no hindsight.
@@ -212,7 +214,7 @@ func (s *CalibrationService) backtest(rows []dbsqlc.ListFinishedMatchesRow, req 
 		}
 		matches++
 		for _, m := range markets {
-			e, err := s.engine.Estimate(m, hp, ap)
+			e, err := eng.Estimate(m, hp, ap)
 			if err != nil {
 				continue
 			}
@@ -317,16 +319,3 @@ func ratio(a float64, n int) float64 {
 }
 
 func round4(v float64) float64 { return math.Round(v*1e4) / 1e4 }
-
-// shrink pulls a team profile's rates towards the league's, weighting the
-// league as prior extra games: (rate·n + league·prior) / (n + prior). The
-// sample size is unchanged, so "limited data" still means the team's own games.
-func shrink(p, league engine.Profile, prior float64) engine.Profile {
-	n := float64(p.SampleSize)
-	mix := func(team, lg float64) float64 { return (team*n + lg*prior) / (n + prior) }
-	p.WinRate, p.DrawRate, p.LossRate = mix(p.WinRate, league.WinRate), mix(p.DrawRate, league.DrawRate), mix(p.LossRate, league.LossRate)
-	p.GoalsForAvg, p.GoalsAgainstAvg = mix(p.GoalsForAvg, league.GoalsForAvg), mix(p.GoalsAgainstAvg, league.GoalsAgainstAvg)
-	p.ScoredRate, p.CleanSheetRate, p.BTTSRate = mix(p.ScoredRate, league.ScoredRate), mix(p.CleanSheetRate, league.CleanSheetRate), mix(p.BTTSRate, league.BTTSRate)
-	p.Over15Rate, p.Over25Rate, p.Under35Rate = mix(p.Over15Rate, league.Over15Rate), mix(p.Over25Rate, league.Over25Rate), mix(p.Under35Rate, league.Under35Rate)
-	return p
-}

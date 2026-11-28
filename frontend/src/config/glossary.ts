@@ -18,7 +18,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   { id: 'fair-odds', term: 'Fair odds', body: "1 ÷ the app's estimated chance. A 50% estimate gives fair odds of 2.00. This is our estimate only; bookmaker odds will differ." },
   { id: 'combined', term: 'Combined chance', body: 'The chance that every leg wins, found by multiplying the chances of each leg. It falls quickly as you add legs.' },
   { id: 'risk-band', term: 'Risk band', body: 'Low: estimated chance of 65% or more. Medium: 45% to under 65%. High: under 45%. Limited data moves a leg up one band. We never estimate above 95%: even a perfect recent record is not a certainty.' },
-  { id: 'form-window', term: 'Form window', body: "How many recent home or away matches a team's stats use. The default is the last 10." },
+  { id: 'form-window', term: 'Form window', body: "How many recent home or away matches a team's stats use. The default is the last 10. Ten games is a small sample, so each estimate also leans on the league's average, as if the team had played 10 more ordinary games. Checked against past seasons, this keeps our percentages much closer to what actually happens. The reasons we show still quote the team's own record." },
 ]
 
 const BY_ID = new Map(GLOSSARY.map((g) => [g.id, g]))

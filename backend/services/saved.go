@@ -212,10 +212,10 @@ func (s *SavedService) Delete(ctx context.Context, id, ticketID string) error {
 // deletes those settled more than 90 days ago (and any older than 180 days).
 // The daily import runs it.
 func (s *SavedService) Cleanup(ctx context.Context) (settledNow, deleted int64, err error) {
-	if settledNow, err = s.q.MarkSavedSettled(ctx); err != nil {
+	now := s.now()
+	if settledNow, err = s.q.MarkSavedSettled(ctx, now); err != nil {
 		return 0, 0, err
 	}
-	now := s.now()
 	deleted, err = s.q.DeleteExpiredSaved(ctx, dbsqlc.DeleteExpiredSavedParams{
 		SettledBefore: now.AddDate(0, 0, -SavedKeepDays),
 		CreatedBefore: now.AddDate(0, 0, -savedMaxDays),

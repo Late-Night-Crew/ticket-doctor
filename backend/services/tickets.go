@@ -419,9 +419,13 @@ func loadProfiles(ctx context.Context, q *dbsqlc.Queries, eng *engine.Engine, si
 	for _, r := range rows {
 		byKey[key{r.TeamID, r.Venue}] = r
 	}
+	leagues, err := leagueProfilesFor(ctx, q, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]engine.Profile, len(sides))
 	for i, t := range sides {
-		p := engine.Profile{Team: t.name, Venue: t.venue}
+		p := engine.Profile{Team: t.name, Venue: t.venue, League: leagues[t.id][t.venue]}
 		if r, ok := byKey[key{t.id, string(t.venue)}]; ok {
 			p.SampleSize = int(r.SampleSize)
 			p.WinRate, p.DrawRate, p.LossRate = r.WinRate, r.DrawRate, r.LossRate
@@ -430,6 +434,38 @@ func loadProfiles(ctx context.Context, q *dbsqlc.Queries, eng *engine.Engine, si
 			p.Over15Rate, p.Over25Rate, p.Under35Rate = r.Over15Rate, r.Over25Rate, r.Under35Rate
 		}
 		out[i] = p
+	}
+	return out, nil
+}
+
+// leagueProfilesFor returns each team's league average at home and away, which
+// estimates pull towards (prior_games). A league with no profile yet (before
+// its first import) gives nil, and the team's rates are used as they are.
+func leagueProfilesFor(ctx context.Context, q *dbsqlc.Queries, teamIDs []int64) (map[int64]map[engine.Venue]*engine.Profile, error) {
+	rows, err := q.ListLeagueProfiles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byLeague := map[string]map[engine.Venue]*engine.Profile{}
+	for _, r := range rows {
+		if byLeague[r.LeagueID] == nil {
+			byLeague[r.LeagueID] = map[engine.Venue]*engine.Profile{}
+		}
+		byLeague[r.LeagueID][engine.Venue(r.Venue)] = &engine.Profile{
+			Team: r.LeagueID, Venue: engine.Venue(r.Venue), SampleSize: int(r.SampleSize),
+			WinRate: r.WinRate, DrawRate: r.DrawRate, LossRate: r.LossRate,
+			GoalsForAvg: r.GfAvg, GoalsAgainstAvg: r.GaAvg,
+			ScoredRate: r.ScoredRate, CleanSheetRate: r.CleanSheetRate, BTTSRate: r.BttsRate,
+			Over15Rate: r.Over15Rate, Over25Rate: r.Over25Rate, Under35Rate: r.Under35Rate,
+		}
+	}
+	teams, err := q.ListTeamLeagues(ctx, teamIDs)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]map[engine.Venue]*engine.Profile, len(teams))
+	for _, t := range teams {
+		out[t.ID] = byLeague[t.LeagueID]
 	}
 	return out, nil
 }

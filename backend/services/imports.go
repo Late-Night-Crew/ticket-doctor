@@ -386,6 +386,7 @@ func (s *ImportService) rebuildProfiles(ctx context.Context, q *dbsqlc.Queries, 
 	home := map[int64][]engine.Result{}
 	away := map[int64][]engine.Result{}
 	all := map[int64][]engine.Result{}
+	var leagueHome, leagueAway []engine.Result
 	for _, r := range rows {
 		hg, ag := int(*r.HomeGoals), int(*r.AwayGoals)
 		h := engine.Result{Date: r.Kickoff, GoalsFor: hg, GoalsAgainst: ag}
@@ -394,6 +395,22 @@ func (s *ImportService) rebuildProfiles(ctx context.Context, q *dbsqlc.Queries, 
 		away[r.AwayTeamID] = append(away[r.AwayTeamID], a)
 		all[r.HomeTeamID] = append(all[r.HomeTeamID], h)
 		all[r.AwayTeamID] = append(all[r.AwayTeamID], a)
+		leagueHome = append(leagueHome, h)
+		leagueAway = append(leagueAway, a)
+	}
+
+	// The league's own average at each venue, which estimates pull towards (prior_games).
+	for venue, results := range map[engine.Venue][]engine.Result{engine.Home: leagueHome, engine.Away: leagueAway} {
+		p := s.engine.BuildLeagueProfile(league, venue, results)
+		if err := q.UpsertLeagueProfile(ctx, dbsqlc.UpsertLeagueProfileParams{
+			LeagueID: league, Venue: string(venue), SampleSize: int32(p.SampleSize),
+			WinRate: p.WinRate, DrawRate: p.DrawRate, LossRate: p.LossRate,
+			GfAvg: p.GoalsForAvg, GaAvg: p.GoalsAgainstAvg,
+			ScoredRate: p.ScoredRate, CleanSheetRate: p.CleanSheetRate, BttsRate: p.BTTSRate,
+			Over15Rate: p.Over15Rate, Over25Rate: p.Over25Rate, Under35Rate: p.Under35Rate,
+		}); err != nil {
+			return 0, nil, fmt.Errorf("save %s league profile: %w", league, err)
+		}
 	}
 
 	window := int16(s.engine.Thresholds().FormWindow)

@@ -216,7 +216,7 @@ Each milestone ends with green CI and a pull request.
   - Low band: said 75.6%, happened 75.3% (was 76.9% vs 73.1%);
   - markets no better than the average: 10 → 3 of 15.
 
-  The gains hold from *m* = 6 to 20. The cost: about 10% fewer legs reach the Low band. Not live yet; it needs the engine, importer and TS scorer (parity) changed together.
+  The gains hold from *m* = 6 to 20. The cost: about 10% fewer legs reach the Low band. **Made live 2026-11-28** as the rule `prior_games` (default 10, SRS addendum A8). The engine, importer (`league_profiles`, migration 10), TS mock scorer and parity golden file all changed together; `ticketdoctor backtest` now uses it by default, and `--prior` overrides it.
 
 ## 6. Decisions needed
 

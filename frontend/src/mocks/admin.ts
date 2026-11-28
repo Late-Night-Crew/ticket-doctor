@@ -62,6 +62,7 @@ const THRESHOLDS: Threshold[] = [
   { key: 'max_suggestions', label: 'Suggestions per leg', description: 'The most swaps offered for one leg (4.3).', value: RULES.swap.maxSuggestions, default: 2, unit: 'count' },
   { key: 'value_margin', label: 'Value margin', description: "A pick is marked value when its estimate beats the odds' implied chance by this much (4.5).", value: RULES.valueMargin, default: 0.05, unit: 'percent' },
   { key: 'bold_floor', label: 'Bold floor', description: 'The lowest estimate the ticket wizard will ever use (4.6).', value: RULES.wizard.boldFloor, default: 0.35, unit: 'percent' },
+  { key: 'prior_games', label: 'League prior', description: "Each team's last-games record is pulled towards its league's average, as if it had this many extra average games, so ten games of form don't overshoot (backtest, 2026-11-28). 0 turns it off.", value: RULES.priorGames, default: 10, unit: 'count' },
   { key: 'max_estimate', label: 'Estimate cap', description: 'No estimate goes above this, so nothing looks certain (addendum A7).', value: RULES.maxEstimate, default: 0.95, unit: 'percent' },
 ]
 

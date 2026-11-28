@@ -191,6 +191,7 @@ func (s *AdminService) Thresholds() []Threshold {
 		cnt("max_suggestions", "Suggestions per leg", "The most swaps offered for one leg (4.3).", cur.MaxSuggestions, def.MaxSuggestions),
 		pct("value_margin", "Value margin", "A pick is marked value when its estimate beats the odds' implied chance by this much (4.5).", cur.ValueMargin, def.ValueMargin),
 		pct("bold_floor", "Bold floor", "The lowest estimate the ticket wizard will ever use (4.6).", cur.BoldFloor, def.BoldFloor),
+		Threshold{Key: "prior_games", Label: "League prior", Description: "Each team's last-games record is pulled towards its league's average, as if it had this many extra average games, so ten games of form don't overshoot (backtest, 2026-11-28). 0 turns it off.", Value: cur.PriorGames, Default: def.PriorGames, Unit: "count"},
 		pct("max_estimate", "Estimate cap", "No estimate goes above this, so nothing looks certain (addendum A7).", cur.MaxEstimate, def.MaxEstimate),
 	}
 }

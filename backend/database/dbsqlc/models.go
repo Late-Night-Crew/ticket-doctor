@@ -42,6 +42,24 @@ type League struct {
 	FdoCode   *string
 }
 
+type LeagueProfile struct {
+	LeagueID       string
+	Venue          string
+	SampleSize     int32
+	WinRate        float64
+	DrawRate       float64
+	LossRate       float64
+	GfAvg          float64
+	GaAvg          float64
+	ScoredRate     float64
+	CleanSheetRate float64
+	BttsRate       float64
+	Over15Rate     float64
+	Over25Rate     float64
+	Under35Rate    float64
+	UpdatedAt      time.Time
+}
+
 type Match struct {
 	ID         int64
 	LeagueID   string
